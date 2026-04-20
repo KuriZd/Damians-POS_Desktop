@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron'
 import { getLocalDb } from '../db/local-db'
-import { enqueueSync } from '../sync/sync-queue'
 
 type ServiceRow = {
   id: number
@@ -53,27 +52,6 @@ function getSupplies(db: ReturnType<typeof getLocalDb>, serviceId: number): Supp
   return db.prepare(
     `SELECT "productId", qty FROM "ServiceSupply" WHERE "serviceId" = ?`
   ).all(serviceId) as SupplyRow[]
-}
-
-function getServiceForSync(db: ReturnType<typeof getLocalDb>, id: number) {
-  return db.prepare(`
-    SELECT
-      id,
-      "publicId" as publicId,
-      code,
-      name,
-      "durationMin" as durationMin,
-      cost,
-      price,
-      "profitPctBp" as profitPctBp,
-      active,
-      "createdAt" as createdAt,
-      "updatedAt" as updatedAt,
-      "deletedAt" as deletedAt
-    FROM "Service"
-    WHERE id = ?
-    LIMIT 1
-  `).get(id) as Record<string, unknown> | undefined
 }
 
 export function registerServicesIpc(): void {
@@ -139,92 +117,18 @@ export function registerServicesIpc(): void {
   })
 
   ipcMain.handle('services:create', (_event, payload: CreateServicePayload) => {
-    const db = getLocalDb()
-    const now = new Date().toISOString()
-    const publicId = crypto.randomUUID()
-
-    const result = db.prepare(
-      `INSERT INTO "Service" ("publicId", code, name, "durationMin", cost, price, "profitPctBp", active, "createdAt", "updatedAt")
-       VALUES (@publicId, @code, @name, @durationMin, @cost, @price, @profitPctBp, 1, @now, @now)`
-    ).run({
-      publicId,
-      code: payload.code,
-      name: payload.name,
-      durationMin: payload.durationMin,
-      cost: payload.cost,
-      price: payload.price,
-      profitPctBp: payload.profitPctBp,
-      now
-    })
-
-    const serviceId = Number(result.lastInsertRowid)
-
-    if (payload.supplies.length > 0) {
-      const insertSupply = db.prepare(
-        `INSERT OR REPLACE INTO "ServiceSupply" ("serviceId", "productId", qty) VALUES (?, ?, ?)`
-      )
-      db.transaction(() => {
-        for (const s of payload.supplies) {
-          insertSupply.run(serviceId, s.productId, s.qty)
-        }
-      })()
-    }
-
-    const serviceRow = getServiceForSync(db, serviceId)
-    if (serviceRow) {
-      enqueueSync('Service', publicId, 'INSERT', serviceRow)
-      enqueueSync('ServiceSupply', publicId, 'REPLACE', getSupplies(db, serviceId))
-    }
-
-    return { id: serviceId }
+    void payload
+    throw new Error('La BD local de servicios es de solo lectura. Crea servicios en Supabase.')
   })
 
   ipcMain.handle('services:update', (_event, id: number, payload: Partial<CreateServicePayload>) => {
-    const db = getLocalDb()
-    const now = new Date().toISOString()
-
-    const sets: string[] = ['"updatedAt" = @now']
-    const params: Record<string, unknown> = { id, now }
-
-    if (payload.name !== undefined) { sets.push('name = @name'); params.name = payload.name }
-    if (payload.code !== undefined) { sets.push('code = @code'); params.code = payload.code }
-    if (payload.durationMin !== undefined) { sets.push('"durationMin" = @durationMin'); params.durationMin = payload.durationMin }
-    if (payload.cost !== undefined) { sets.push('cost = @cost'); params.cost = payload.cost }
-    if (payload.price !== undefined) { sets.push('price = @price'); params.price = payload.price }
-    if (payload.profitPctBp !== undefined) { sets.push('"profitPctBp" = @profitPctBp'); params.profitPctBp = payload.profitPctBp }
-
-    db.prepare(`UPDATE "Service" SET ${sets.join(', ')} WHERE id = @id`).run(params)
-
-    if (payload.supplies !== undefined) {
-      const supplies = payload.supplies
-      db.transaction(() => {
-        db.prepare(`DELETE FROM "ServiceSupply" WHERE "serviceId" = ?`).run(id)
-        const insert = db.prepare(
-          `INSERT INTO "ServiceSupply" ("serviceId", "productId", qty) VALUES (?, ?, ?)`
-        )
-        for (const s of supplies) {
-          insert.run(id, s.productId, s.qty)
-        }
-      })()
-    }
-
-    const serviceRow = getServiceForSync(db, id)
-    if (serviceRow && typeof serviceRow.publicId === 'string') {
-      enqueueSync('Service', serviceRow.publicId, 'UPDATE', serviceRow)
-      enqueueSync('ServiceSupply', serviceRow.publicId, 'REPLACE', getSupplies(db, id))
-    }
-
-    return { id }
+    void id
+    void payload
+    throw new Error('La BD local de servicios es de solo lectura. Actualiza servicios en Supabase.')
   })
 
   ipcMain.handle('services:remove', (_event, id: number) => {
-    const db = getLocalDb()
-    const now = new Date().toISOString()
-    db.prepare(`UPDATE "Service" SET "deletedAt" = ?, "updatedAt" = ? WHERE id = ?`).run(now, now, id)
-    const serviceRow = getServiceForSync(db, id)
-    if (serviceRow && typeof serviceRow.publicId === 'string') {
-      enqueueSync('Service', serviceRow.publicId, 'DELETE', { publicId: serviceRow.publicId, deletedAt: now })
-    }
-    return { ok: true }
+    void id
+    throw new Error('La BD local de servicios es de solo lectura. Elimina servicios en Supabase.')
   })
 }

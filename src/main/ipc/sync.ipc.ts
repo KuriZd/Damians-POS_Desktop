@@ -1,7 +1,6 @@
 import { ipcMain } from 'electron'
 import { getLocalDb } from '../db/local-db'
 import { supabase } from '../supabase/client'
-import type { SyncAction } from '../sync/sync-queue'
 
 const MAX_RETRIES = 3
 
@@ -14,15 +13,6 @@ export type SyncConflict = {
 }
 
 let lastConflicts: SyncConflict[] = []
-
-type SyncQueueRow = {
-  id: number
-  entity_name: string
-  entity_public_id: string
-  action: SyncAction
-  payload_json: string
-  retries: number
-}
 
 type ProductRemote = {
   id: number
@@ -81,105 +71,8 @@ type ServiceSupplyRemote = {
 }
 
 export async function pushPending(): Promise<{ pushed: number; failed: number }> {
-  const db = getLocalDb()
-  const rows = db.prepare(
-    `SELECT id, entity_name, entity_public_id, action, payload_json, retries
-     FROM sync_queue WHERE status = 'PENDING' ORDER BY created_at ASC`
-  ).all() as SyncQueueRow[]
-
-  const markSynced = db.prepare(
-    `UPDATE sync_queue SET status = 'SYNCED', updated_at = ? WHERE id = ?`
-  )
-  const markFailed = db.prepare(
-    `UPDATE sync_queue SET status = 'FAILED', retries = ?, last_error = ?, updated_at = ? WHERE id = ?`
-  )
-  const incrementRetry = db.prepare(
-    `UPDATE sync_queue SET retries = retries + 1, last_error = ?, updated_at = ? WHERE id = ?`
-  )
-
-  let pushed = 0
-  let failed = 0
-
-  for (const row of rows) {
-    const now = new Date().toISOString()
-    let payload: Record<string, unknown> | Array<Record<string, unknown>>
-
-    try {
-      payload = JSON.parse(row.payload_json) as Record<string, unknown>
-    } catch {
-      markFailed.run(row.retries + 1, 'Invalid JSON in payload', now, row.id)
-      failed++
-      continue
-    }
-
-    try {
-      if (row.entity_name === 'ServiceSupply' && row.action === 'REPLACE') {
-        const { data: service, error: serviceError } = await supabase
-          .from('Service')
-          .select('id')
-          .eq('publicId', row.entity_public_id)
-          .maybeSingle()
-
-        if (serviceError) throw new Error(serviceError.message)
-        if (!service?.id) throw new Error(`Service not found for publicId ${row.entity_public_id}`)
-
-        const remoteServiceId = Number(service.id)
-        const supplies = Array.isArray(payload) ? payload : []
-        const normalizedSupplies = supplies
-          .map((item) => ({
-            serviceId: remoteServiceId,
-            productId: Number(item.productId),
-            qty: Number(item.qty)
-          }))
-          .filter((item) => Number.isFinite(item.productId) && Number.isFinite(item.qty) && item.qty > 0)
-
-        const { error: deleteError } = await supabase
-          .from('ServiceSupply')
-          .delete()
-          .eq('serviceId', remoteServiceId)
-        if (deleteError) throw new Error(deleteError.message)
-
-        if (normalizedSupplies.length > 0) {
-          const { error: insertError } = await supabase
-            .from('ServiceSupply')
-            .insert(normalizedSupplies)
-          if (insertError) throw new Error(insertError.message)
-        }
-      } else if (row.action === 'INSERT') {
-        const { error } = await supabase.from(row.entity_name).insert(payload)
-        if (error) throw new Error(error.message)
-      } else if (row.action === 'UPDATE') {
-        const { error } = await supabase
-          .from(row.entity_name)
-          .update(payload)
-          .eq('publicId', row.entity_public_id)
-        if (error) throw new Error(error.message)
-      } else if (row.action === 'DELETE') {
-        const { error } = await supabase
-          .from(row.entity_name)
-          .delete()
-          .eq('publicId', row.entity_public_id)
-        if (error) throw new Error(error.message)
-      } else {
-        throw new Error(`Unsupported sync action: ${row.action}`)
-      }
-
-      markSynced.run(now, row.id)
-      pushed++
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      const newRetries = row.retries + 1
-
-      if (newRetries >= MAX_RETRIES) {
-        markFailed.run(newRetries, errorMsg, now, row.id)
-        failed++
-      } else {
-        incrementRetry.run(errorMsg, now, row.id)
-      }
-    }
-  }
-
-  return { pushed, failed }
+  void MAX_RETRIES
+  return { pushed: 0, failed: 0 }
 }
 
 async function fetchRemoteCategories(): Promise<CategoryRemote[]> {

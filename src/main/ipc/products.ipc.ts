@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron'
 import { getLocalDb } from '../db/local-db'
-import { enqueueSync } from '../sync/sync-queue'
 
 type ProductRow = {
   id: number
@@ -19,18 +18,6 @@ type ProductRow = {
   active: number
 }
 
-type CreateProductPayload = {
-  sku: string
-  name: string
-  price: number
-  cost: number
-  profitPctBp: number
-  stock: number
-  stockMin: number
-  stockMax: number
-  imageDataUrl: string | null
-}
-
 const SELECT_COLUMNS = `
   id, "publicId", sku, barcode, name, price, cost,
   "profitPctBp" as profitPctBp, stock,
@@ -40,33 +27,6 @@ const SELECT_COLUMNS = `
 
 function mapRow(row: ProductRow) {
   return { ...row, active: Boolean(row.active) }
-}
-
-function getProductForSync(db: ReturnType<typeof getLocalDb>, id: number) {
-  return db.prepare(`
-    SELECT
-      id,
-      "publicId" as publicId,
-      sku,
-      barcode,
-      name,
-      price,
-      cost,
-      "profitPctBp" as profitPctBp,
-      stock,
-      "stockMin" as stockMin,
-      "stockMax" as stockMax,
-      "imagePath" as imagePath,
-      "taxRateBp" as taxRateBp,
-      "categoryId" as categoryId,
-      active,
-      "createdAt" as createdAt,
-      "updatedAt" as updatedAt,
-      "deletedAt" as deletedAt
-    FROM "Product"
-    WHERE id = ?
-    LIMIT 1
-  `).get(id) as Record<string, unknown> | undefined
 }
 
 export function registerProductsIpc(): void {
@@ -133,75 +93,15 @@ export function registerProductsIpc(): void {
     return { items: items.map(mapRow), total: count, page, pageSize }
   })
 
-  ipcMain.handle('products:create', (_event, payload: CreateProductPayload) => {
-    const db = getLocalDb()
-    const now = new Date().toISOString()
-    const publicId = crypto.randomUUID()
-
-    const result = db.prepare(`
-      INSERT INTO "Product" (
-        "publicId", sku, name, price, cost, "profitPctBp",
-        stock, "stockMin", "stockMax", "imagePath", active, "createdAt", "updatedAt"
-      ) VALUES (
-        @publicId, @sku, @name, @price, @cost, @profitPctBp,
-        @stock, @stockMin, @stockMax, @imagePath, 1, @now, @now
-      )
-    `).run({
-      publicId,
-      sku: payload.sku,
-      name: payload.name,
-      price: payload.price,
-      cost: payload.cost,
-      profitPctBp: payload.profitPctBp,
-      stock: payload.stock,
-      stockMin: payload.stockMin,
-      stockMax: payload.stockMax,
-      imagePath: payload.imageDataUrl ?? null,
-      now
-    })
-
-    const id = Number(result.lastInsertRowid)
-    const row = getProductForSync(db, id)
-    if (row) enqueueSync('Product', publicId, 'INSERT', row)
-
-    return { id }
+  ipcMain.handle('products:create', () => {
+    throw new Error('La BD local de productos es de solo lectura. Crea productos en Supabase.')
   })
 
-  ipcMain.handle('products:update', (_event, id: number, payload: Partial<CreateProductPayload>) => {
-    const db = getLocalDb()
-    const now = new Date().toISOString()
-    const sets: string[] = ['"updatedAt" = @now']
-    const params: Record<string, unknown> = { id, now }
-
-    if (payload.sku !== undefined)        { sets.push('sku = @sku');                      params.sku = payload.sku }
-    if (payload.name !== undefined)       { sets.push('name = @name');                    params.name = payload.name }
-    if (payload.price !== undefined)      { sets.push('price = @price');                  params.price = payload.price }
-    if (payload.cost !== undefined)       { sets.push('cost = @cost');                    params.cost = payload.cost }
-    if (payload.profitPctBp !== undefined){ sets.push('"profitPctBp" = @profitPctBp');   params.profitPctBp = payload.profitPctBp }
-    if (payload.stock !== undefined)      { sets.push('stock = @stock');                  params.stock = payload.stock }
-    if (payload.stockMin !== undefined)   { sets.push('"stockMin" = @stockMin');          params.stockMin = payload.stockMin }
-    if (payload.stockMax !== undefined)   { sets.push('"stockMax" = @stockMax');          params.stockMax = payload.stockMax }
-    if (payload.imageDataUrl !== undefined){ sets.push('"imagePath" = @imagePath');       params.imagePath = payload.imageDataUrl }
-
-    db.prepare(`UPDATE "Product" SET ${sets.join(', ')} WHERE id = @id AND "deletedAt" IS NULL`).run(params)
-    const row = getProductForSync(db, id)
-    if (row && typeof row.publicId === 'string') {
-      enqueueSync('Product', row.publicId, 'UPDATE', row)
-    }
-    return { id }
+  ipcMain.handle('products:update', () => {
+    throw new Error('La BD local de productos es de solo lectura. Actualiza productos en Supabase.')
   })
 
-  ipcMain.handle('products:remove', (_event, id: number) => {
-    const db = getLocalDb()
-    const now = new Date().toISOString()
-    db.prepare(`
-      UPDATE "Product" SET "deletedAt" = ?, "updatedAt" = ?, active = 0
-      WHERE id = ? AND "deletedAt" IS NULL
-    `).run(now, now, id)
-    const row = getProductForSync(db, id)
-    if (row && typeof row.publicId === 'string') {
-      enqueueSync('Product', row.publicId, 'DELETE', { publicId: row.publicId, deletedAt: now })
-    }
-    return { ok: true as const }
+  ipcMain.handle('products:remove', () => {
+    throw new Error('La BD local de productos es de solo lectura. Elimina productos en Supabase.')
   })
 }
