@@ -27,6 +27,28 @@ type LocalUserRow = {
 
 let currentUser: AuthUser | null = null
 
+type RemoteAuthRow = {
+  id: number
+  name: string
+  username: string
+  role: AppRole
+  active: boolean
+}
+
+type RemoteLoginAttempt = {
+  candidate: string
+  rpcError: string | null
+  matched: boolean
+}
+
+type RemoteUserProbe = {
+  candidate: string
+  exists: boolean
+  active: boolean | null
+  username: string | null
+  error: string | null
+}
+
 function sessionFilePath(): string {
   return path.join(app.getPath('userData'), 'session.json')
 }
@@ -56,9 +78,91 @@ function readSession(): AuthUser | null {
   }
 }
 
+async function loginAgainstSupabase(
+  usernameCandidates: string[],
+  password: string
+): Promise<{ user: RemoteAuthRow | null; attempts: RemoteLoginAttempt[] }> {
+  const attempts: RemoteLoginAttempt[] = []
+
+  for (const candidate of usernameCandidates) {
+    const { data, error } = await supabase.rpc('pos_login', {
+      p_username: candidate,
+      p_password: password
+    })
+
+    if (error) {
+      attempts.push({
+        candidate,
+        rpcError: error.message,
+        matched: false
+      })
+      console.warn(`[auth] Falló pos_login para "${candidate}": ${error.message}`)
+      continue
+    }
+
+    const remoteUser = (Array.isArray(data) ? data[0] : null) as RemoteAuthRow | null
+    if (remoteUser) {
+      attempts.push({
+        candidate,
+        rpcError: null,
+        matched: true
+      })
+      return { user: remoteUser, attempts }
+    }
+
+    attempts.push({
+      candidate,
+      rpcError: null,
+      matched: false
+    })
+  }
+
+  return { user: null, attempts }
+}
+
+async function probeRemoteUsers(usernameCandidates: string[]): Promise<RemoteUserProbe[]> {
+  const probes: RemoteUserProbe[] = []
+
+  for (const candidate of usernameCandidates) {
+    const { data, error } = await supabase
+      .from('User')
+      .select('id, username, active')
+      .ilike('username', candidate)
+      .limit(5)
+
+    if (error) {
+      probes.push({
+        candidate,
+        exists: false,
+        active: null,
+        username: null,
+        error: error.message
+      })
+      continue
+    }
+
+    const rows = Array.isArray(data) ? data : []
+    const exactRow =
+      rows.find((row) => String(row.username ?? '') === candidate) ??
+      rows.find((row) => String(row.username ?? '').toLowerCase() === candidate.toLowerCase()) ??
+      null
+
+    probes.push({
+      candidate,
+      exists: Boolean(exactRow),
+      active: exactRow ? Boolean(exactRow.active) : null,
+      username: exactRow ? String(exactRow.username ?? '') : null,
+      error: null
+    })
+  }
+
+  return probes
+}
+
 export function registerAuthIpc(): void {
   ipcMain.handle('auth:login', async (_event, username: string, password: string) => {
-    const normalizedUsername = username.trim().toLowerCase()
+    const trimmedUsername = username.trim()
+    const normalizedUsername = trimmedUsername.toLowerCase()
     const db = getLocalDb()
 
     const localUser = db
@@ -80,36 +184,65 @@ export function registerAuthIpc(): void {
       )
       .get(normalizedUsername) as LocalUserRow | undefined
 
-    if (localUser?.passwordHashLocal) {
-      const isLocalPasswordValid = await bcrypt.compare(password, localUser.passwordHashLocal)
-
-      if (isLocalPasswordValid) {
-        currentUser = {
-          id: localUser.id,
-          name: localUser.name,
-          username: localUser.username,
-          role: localUser.role,
-          active: Boolean(localUser.active),
-          source: 'local'
-        }
-        saveSession(currentUser)
-        return currentUser
-      }
-    }
-
-    const { data, error } = await supabase.rpc('pos_login', {
-      p_username: normalizedUsername,
-      p_password: password
-    })
-
-    if (error) {
-      return null
-    }
-
-    const remoteUser = Array.isArray(data) ? data[0] : null
+    const usernameCandidates = Array.from(new Set([trimmedUsername, normalizedUsername].filter(Boolean)))
+    const { user: remoteUser, attempts } = await loginAgainstSupabase(usernameCandidates, password)
 
     if (!remoteUser) {
-      return null
+      const rpcFailures = attempts.filter((attempt) => attempt.rpcError)
+      const hasOnlyRpcFailures = attempts.length > 0 && rpcFailures.length === attempts.length
+
+      if (hasOnlyRpcFailures && localUser?.passwordHashLocal) {
+        const isLocalPasswordValid = await bcrypt.compare(password, localUser.passwordHashLocal)
+
+        if (isLocalPasswordValid) {
+          currentUser = {
+            id: localUser.id,
+            name: localUser.name,
+            username: localUser.username,
+            role: localUser.role,
+            active: Boolean(localUser.active),
+            source: 'local'
+          }
+          saveSession(currentUser)
+          return currentUser
+        }
+
+        console.warn(`[auth] Password local inválido para "${localUser.username}"`)
+      }
+
+      if (rpcFailures.length > 0) {
+        const attemptsSummary = rpcFailures
+          .map((attempt) => `"${attempt.candidate}": ${attempt.rpcError}`)
+          .join(' | ')
+        throw new Error(`Login remoto falló en Supabase. Intentos: ${attemptsSummary}`)
+      }
+
+      const probes = await probeRemoteUsers(usernameCandidates)
+      const visibleUsers = probes.filter((probe) => probe.exists)
+      const probeErrors = probes.filter((probe) => probe.error)
+
+      if (visibleUsers.length > 0) {
+        const summary = visibleUsers
+          .map((probe) => `${probe.username} (active=${probe.active ? 'true' : 'false'})`)
+          .join(', ')
+        throw new Error(
+          `El usuario existe en Supabase pero pos_login rechazó las credenciales. Coincidencias: ${summary}.`
+        )
+      }
+
+      if (probeErrors.length > 0) {
+        const summary = probeErrors
+          .map((probe) => `"${probe.candidate}": ${probe.error}`)
+          .join(' | ')
+        throw new Error(
+          `pos_login no encontró usuario y además no se pudo inspeccionar la tabla User. Detalle: ${summary}`
+        )
+      }
+
+      const triedCandidates = usernameCandidates.join(', ')
+      throw new Error(
+        `Supabase no encontró ningún usuario visible con esos nombres. Usuarios probados: ${triedCandidates}.`
+      )
     }
 
     const passwordHashLocal = await bcrypt.hash(password, 10)

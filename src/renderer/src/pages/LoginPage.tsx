@@ -60,10 +60,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): ReactElem
 
             // Notificamos al contenedor principal que el login fue exitoso.
             onLoginSuccess(user)
-        } catch (err) {
-            // Manejamos errores reales del backend o IPC.
-            const message = err instanceof Error ? err.message : 'No fue posible iniciar sesión'
-            setError(message)
+        } catch {
+            setError('Usuario o contraseña incorrectos')
         } finally {
             setLoading(false)
         }
