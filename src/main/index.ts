@@ -7,6 +7,8 @@ import { registerSalesIpc } from './ipc/sales.ipc'
 import { registerSyncIpc } from './ipc/sync.ipc'
 import { registerAuthIpc } from './ipc/auth.ipc'
 import { registerUsersIpc } from './ipc/users.ipc'
+import { registerInventoryIpc } from './ipc/inventory.ipc'
+import { registerDashboardIpc } from './ipc/dashboard.ipc'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -38,6 +40,8 @@ app.whenReady().then(() => {
   registerServicesIpc()
   registerSalesIpc()
   registerSyncIpc()
+  registerInventoryIpc()
+  registerDashboardIpc()
   createWindow()
 })
 

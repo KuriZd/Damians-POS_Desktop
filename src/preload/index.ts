@@ -23,10 +23,22 @@ contextBridge.exposeInMainWorld('pos', {
   users: {
     list: () => ipcRenderer.invoke('users:list'),
     create: (payload: unknown) => ipcRenderer.invoke('users:create', payload),
-    update: (id: number, payload: unknown) => ipcRenderer.invoke('users:update', id, payload)
+    update: (id: number, payload: unknown) => ipcRenderer.invoke('users:update', id, payload),
+    delete: (id: number) => ipcRenderer.invoke('users:delete', id)
+  },
+  inventory: {
+    products:         ()                 => ipcRenderer.invoke('inventory:products'),
+    stats:            (period: string)   => ipcRenderer.invoke('inventory:stats', period),
+    chart:            ()                 => ipcRenderer.invoke('inventory:chart'),
+    movements:        (typeFilter?: string) => ipcRenderer.invoke('inventory:movements', typeFilter),
+    registerMovement: (payload: unknown) => ipcRenderer.invoke('inventory:registerMovement', payload),
+  },
+  dashboard: {
+    stats: () => ipcRenderer.invoke('dashboard:stats'),
   },
   sales: {
-    create: (payload: unknown) => ipcRenderer.invoke('sales:create', payload)
+    create:  (payload: unknown) => ipcRenderer.invoke('sales:create', payload),
+    recent:  (limit?: number)   => ipcRenderer.invoke('sales:recent', limit),
   },
   sync: {
     pullProducts: () => ipcRenderer.invoke('sync:pullProducts'),
