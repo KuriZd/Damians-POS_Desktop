@@ -1,11 +1,16 @@
 import { ipcMain } from 'electron'
 import bcrypt from 'bcryptjs'
+import { createHash, randomUUID } from 'node:crypto'
 import { getLocalDb } from '../db/local-db'
 import { supabaseAdmin } from '../supabase/client'
 
 type AppRole = 'ADMIN' | 'CASHIER' | 'SUPERVISOR'
 
 type RemoteUserRow = Record<string, unknown>
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
+}
 
 export function registerUsersIpc(): void {
   ipcMain.handle('users:list', async () => {
@@ -47,11 +52,25 @@ export function registerUsersIpc(): void {
       _event,
       payload: { username: string; name: string; role: AppRole; password: string; active: boolean }
     ) => {
+      const now = new Date().toISOString()
+      const normalizedUsername = payload.username.trim().toLowerCase()
+      const normalizedName = payload.name.trim()
+      const remotePasswordHash = sha256Hex(payload.password)
       const passwordHashLocal = await bcrypt.hash(payload.password, 10)
 
       const { data, error } = await supabaseAdmin
         .from('User')
-        .insert({ username: payload.username, name: payload.name, role: payload.role, active: payload.active, passwordHashLocal })
+        .insert({
+          name: normalizedName,
+          username: normalizedUsername,
+          pinHash: remotePasswordHash,
+          role: payload.role,
+          active: payload.active,
+          createdAt: now,
+          publicId: randomUUID(),
+          updatedAt: now,
+          passwordHash: remotePasswordHash
+        })
         .select('id, username, name, role, active')
         .single()
 
@@ -86,15 +105,18 @@ export function registerUsersIpc(): void {
       payload: { username?: string; name?: string; role?: AppRole; active?: boolean; password?: string }
     ) => {
       const remotePayload: Record<string, unknown> = {}
-      if (payload.username !== undefined) remotePayload.username = payload.username
-      if (payload.name !== undefined) remotePayload.name = payload.name
+      if (payload.username !== undefined) remotePayload.username = payload.username.trim().toLowerCase()
+      if (payload.name !== undefined) remotePayload.name = payload.name.trim()
       if (payload.role !== undefined) remotePayload.role = payload.role
       if (payload.active !== undefined) remotePayload.active = payload.active
+      remotePayload.updatedAt = new Date().toISOString()
 
       let passwordHashLocal: string | undefined
       if (payload.password) {
         passwordHashLocal = await bcrypt.hash(payload.password, 10)
-        remotePayload.passwordHashLocal = passwordHashLocal
+        const remotePasswordHash = sha256Hex(payload.password)
+        remotePayload.pinHash = remotePasswordHash
+        remotePayload.passwordHash = remotePasswordHash
       }
 
       const { error } = await supabaseAdmin.from('User').update(remotePayload).eq('id', id)
@@ -104,8 +126,8 @@ export function registerUsersIpc(): void {
       const setClauses: string[] = ['"updatedAt" = CURRENT_TIMESTAMP']
       const params: Record<string, unknown> = { id }
 
-      if (payload.username !== undefined) { setClauses.push('username = @username'); params.username = payload.username }
-      if (payload.name !== undefined) { setClauses.push('name = @name'); params.name = payload.name }
+      if (payload.username !== undefined) { setClauses.push('username = @username'); params.username = payload.username.trim().toLowerCase() }
+      if (payload.name !== undefined) { setClauses.push('name = @name'); params.name = payload.name.trim() }
       if (payload.role !== undefined) { setClauses.push('role = @role'); params.role = payload.role }
       if (payload.active !== undefined) { setClauses.push('active = @active'); params.active = payload.active ? 1 : 0 }
       if (passwordHashLocal) { setClauses.push('"passwordHashLocal" = @passwordHashLocal'); params.passwordHashLocal = passwordHashLocal }

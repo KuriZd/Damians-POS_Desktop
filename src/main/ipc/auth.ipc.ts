@@ -1,9 +1,10 @@
 import { ipcMain, app } from 'electron'
 import bcrypt from 'bcryptjs'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { getLocalDb } from '../db/local-db'
-import { supabase } from '../supabase/client'
+import { supabase, supabaseAdmin } from '../supabase/client'
 
 type AppRole = 'ADMIN' | 'CASHIER' | 'SUPERVISOR'
 
@@ -35,6 +36,11 @@ type RemoteAuthRow = {
   active: boolean
 }
 
+type RemoteUserCredentialRow = RemoteAuthRow & {
+  passwordHash?: string | null
+  pinHash?: string | null
+}
+
 type RemoteLoginAttempt = {
   candidate: string
   rpcError: string | null
@@ -47,6 +53,10 @@ type RemoteUserProbe = {
   active: boolean | null
   username: string | null
   error: string | null
+}
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
 function sessionFilePath(): string {
@@ -83,6 +93,7 @@ async function loginAgainstSupabase(
   password: string
 ): Promise<{ user: RemoteAuthRow | null; attempts: RemoteLoginAttempt[] }> {
   const attempts: RemoteLoginAttempt[] = []
+  const remotePasswordHash = sha256Hex(password)
 
   for (const candidate of usernameCandidates) {
     const { data, error } = await supabase.rpc('pos_login', {
@@ -115,6 +126,52 @@ async function loginAgainstSupabase(
       rpcError: null,
       matched: false
     })
+
+    const { data: directRows, error: directError } = await supabaseAdmin
+      .from('User')
+      .select('id, name, username, role, active, passwordHash, pinHash')
+      .ilike('username', candidate)
+      .limit(5)
+
+    if (directError) {
+      attempts.push({
+        candidate,
+        rpcError: `[direct-check] ${directError.message}`,
+        matched: false
+      })
+      continue
+    }
+
+    const rows = (directRows ?? []) as RemoteUserCredentialRow[]
+    const exactRow =
+      rows.find((row) => String(row.username ?? '') === candidate) ??
+      rows.find((row) => String(row.username ?? '').toLowerCase() === candidate.toLowerCase()) ??
+      null
+
+    if (!exactRow) continue
+
+    const storedPasswordHash = typeof exactRow.passwordHash === 'string' ? exactRow.passwordHash : null
+    const storedPinHash = typeof exactRow.pinHash === 'string' ? exactRow.pinHash : null
+    const isMatch = storedPasswordHash === remotePasswordHash || storedPinHash === remotePasswordHash
+
+    attempts.push({
+      candidate,
+      rpcError: null,
+      matched: isMatch
+    })
+
+    if (isMatch && exactRow.active) {
+      return {
+        user: {
+          id: exactRow.id,
+          name: exactRow.name,
+          username: exactRow.username,
+          role: exactRow.role,
+          active: Boolean(exactRow.active)
+        },
+        attempts
+      }
+    }
   }
 
   return { user: null, attempts }
@@ -124,7 +181,7 @@ async function probeRemoteUsers(usernameCandidates: string[]): Promise<RemoteUse
   const probes: RemoteUserProbe[] = []
 
   for (const candidate of usernameCandidates) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('User')
       .select('id, username, active')
       .ilike('username', candidate)
