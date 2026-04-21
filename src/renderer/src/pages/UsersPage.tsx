@@ -42,6 +42,10 @@ async function updateUser(id: number, payload: UpdateUserPayload): Promise<void>
   await window.pos.users.update(id, payload)
 }
 
+async function deleteUser(id: number): Promise<void> {
+  await window.pos.users.delete(id)
+}
+
 export default function UsersPage({ user }: UsersPageProps): JSX.Element {
   const [items, setItems] = useState<UserListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +55,7 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null)
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const manageableRoles = useMemo(() => allowedManagedRoles(user.role), [user.role])
 
@@ -109,6 +114,30 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
     setIsModalOpen(false)
     setEditingUser(null)
     setForm(INITIAL_FORM)
+  }
+
+  async function handleDelete(target: UserListItem): Promise<void> {
+    if (target.id === user.id) {
+      setError('No puedes eliminar tu propia cuenta.')
+      return
+    }
+    if (!canManageTarget(user.role, target.role)) {
+      setError('No tienes permiso para eliminar este usuario.')
+      return
+    }
+    const confirmed = window.confirm(`¿Eliminar al usuario "${target.name}" (${target.username})? Esta acción no se puede deshacer.`)
+    if (!confirmed) return
+
+    try {
+      setDeletingId(target.id)
+      setError(null)
+      await deleteUser(target.id)
+      await load()
+    } catch (delError) {
+      setError(delError instanceof Error ? delError.message : 'No se pudo eliminar el usuario.')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -247,9 +276,17 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
                     className={styles.editButton}
                     type="button"
                     onClick={() => openEdit(item)}
-                    disabled={!canManageTarget(user.role, item.role)}
+                    disabled={!canManageTarget(user.role, item.role) || deletingId === item.id}
                   >
                     Editar
+                  </button>
+                  <button
+                    className={styles.deleteButton}
+                    type="button"
+                    onClick={() => void handleDelete(item)}
+                    disabled={!canManageTarget(user.role, item.role) || item.id === user.id || deletingId === item.id}
+                  >
+                    {deletingId === item.id ? '...' : 'Eliminar'}
                   </button>
                 </div>
               </div>

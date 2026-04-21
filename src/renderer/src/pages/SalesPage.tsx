@@ -21,10 +21,9 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiRefreshCw,
+  FiX,
+  FiScissors,
 } from 'react-icons/fi'
-import {
-  MdOutlineBookmarkBorder,
-} from 'react-icons/md'
 import { AiOutlineProduct } from 'react-icons/ai'
 import { FaHandshake } from 'react-icons/fa'
 
@@ -118,9 +117,11 @@ type SalesHeaderProps = {
   onSearchKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void
   searchRef: React.RefObject<HTMLInputElement | null>
   cashierName: string
+  onHistorial: () => void
+  onCorte: () => void
 }
 
-function SalesHeader({ search, onSearch, onSearchKeyDown, searchRef, cashierName }: SalesHeaderProps): ReactElement {
+function SalesHeader({ search, onSearch, onSearchKeyDown, searchRef, cashierName, onHistorial, onCorte }: SalesHeaderProps): ReactElement {
   const [clock, setClock] = useState(nowStr())
 
   useEffect(() => {
@@ -150,11 +151,11 @@ function SalesHeader({ search, onSearch, onSearchKeyDown, searchRef, cashierName
       </div>
 
       <div className={styles.headerRight}>
-        <button className={styles.headerBtn}>
-          <MdOutlineBookmarkBorder size={16} />
-          Cotización
+        <button className={styles.headerBtn} onClick={onCorte}>
+          <FiScissors size={16} />
+          Corte de caja
         </button>
-        <button className={styles.headerBtn}>
+        <button className={styles.headerBtn} onClick={onHistorial}>
           <FiClock size={16} />
           Historial
         </button>
@@ -449,6 +450,88 @@ function PaymentSection({
   )
 }
 
+// ─── Historial Modal ─────────────────────────────────────────────────────────
+
+const METHOD_LABEL: Record<string, string> = {
+  efectivo:      'Efectivo',
+  tarjeta:       'Tarjeta',
+  transferencia: 'Transferencia',
+  mixto:         'Mixto',
+}
+
+type HistorialModalProps = {
+  onClose: () => void
+}
+
+function HistorialModal({ onClose }: HistorialModalProps): ReactElement {
+  const [sales, setSales] = useState<RecentSale[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void window.pos.sales.recent(40).then(data => {
+      setSales(data)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div className={styles.modalTitle}>
+            <FiClock size={18} />
+            Historial de ventas
+          </div>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Cerrar">
+            <FiX size={18} />
+          </button>
+        </div>
+
+        <div className={styles.modalBody}>
+          {loading ? (
+            <div className={styles.modalLoading}>
+              <FiRefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} />
+              <span>Cargando…</span>
+            </div>
+          ) : sales.length === 0 ? (
+            <div className={styles.modalEmpty}>Sin ventas registradas.</div>
+          ) : (
+            <table className={styles.histTable}>
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Cajero</th>
+                  <th>Artículos</th>
+                  <th>Método</th>
+                  <th className={styles.histColTotal}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map(s => {
+                  const d = new Date(s.createdAt)
+                  return (
+                    <tr key={s.id}>
+                      <td className={styles.histFolio}>{s.folio}</td>
+                      <td>{d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td>{d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>{s.cashierName}</td>
+                      <td className={styles.histCenter}>{s.itemCount}</td>
+                      <td>{METHOD_LABEL[s.paymentMethod] ?? s.paymentMethod}</td>
+                      <td className={styles.histTotal}>{fmt(s.total)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
@@ -463,6 +546,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   const [notes, setNotes] = useState('')
   const [notesOpen, setNotesOpen] = useState(false)
   const [charging, setCharging] = useState(false)
+  const [historialOpen, setHistorialOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -594,12 +678,16 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
   return (
     <div className={styles.page}>
+      {historialOpen && <HistorialModal onClose={() => setHistorialOpen(false)} />}
+
       <SalesHeader
         search={search}
         onSearch={setSearch}
         onSearchKeyDown={handleSearchKeyDown}
         searchRef={searchRef}
         cashierName={user.name}
+        onHistorial={() => setHistorialOpen(true)}
+        onCorte={() => { /* TODO: corte de caja */ }}
       />
 
       <div className={styles.body}>

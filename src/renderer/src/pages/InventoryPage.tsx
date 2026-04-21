@@ -1,81 +1,19 @@
-import { useState, useMemo, type JSX } from 'react'
+import { useEffect, useMemo, useState, type JSX } from 'react'
 import {
-  FiSearch, FiDownload, FiPlus, FiTrendingUp, FiTrendingDown,
+  FiSearch, FiPlus, FiTrendingUp,
   FiAlertTriangle, FiPackage, FiDollarSign, FiBarChart2,
-  FiActivity, FiArrowUp, FiArrowDown, FiEye, FiEdit2,
-  FiX, FiFilter, FiBox, FiClock, FiShoppingBag,
-  FiRefreshCw, FiChevronDown
+  FiActivity, FiArrowUp, FiArrowDown, FiEye,
+  FiX, FiFilter, FiBox, FiShoppingBag,
+  FiRefreshCw, FiChevronDown, FiSave
 } from 'react-icons/fi'
 import styles from './InventoryPage.module.css'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Period = 'today' | 'week' | 'month'
+type Period    = 'today' | 'week' | 'month'
 type ChartMode = 'sales' | 'profit' | 'both'
-type MoveType = 'entrada' | 'venta' | 'ajuste' | 'merma' | 'devolucion'
+type MoveType  = 'entrada' | 'venta' | 'ajuste' | 'merma' | 'devolucion'
 type StockStatus = 'ok' | 'low' | 'out'
-
-type ChartPoint = { label: string; sales: number; profit: number }
-type Movement = {
-  id: number; date: string; time: string; product: string
-  type: MoveType; qty: number; stockBefore: number; stockAfter: number
-  user: string; note: string
-}
-type ProductRow = {
-  id: number; name: string; sku: string; category: string
-  stock: number; stockMin: number; stockMax: number
-  cost: number; price: number; consumption: number
-  lastMove: string; status: StockStatus
-}
-type AlertItem = { id: number; level: 'critical' | 'warning' | 'info'; message: string; product: string }
-
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-
-const CHART_DATA: ChartPoint[] = [
-  { label: 'L', sales: 3240, profit: 1180 },
-  { label: 'M', sales: 2890, profit: 1040 },
-  { label: 'X', sales: 4120, profit: 1490 },
-  { label: 'J', sales: 3780, profit: 1360 },
-  { label: 'V', sales: 5230, profit: 1920 },
-  { label: 'S', sales: 6140, profit: 2280 },
-  { label: 'H', sales: 2100, profit: 780 },
-]
-
-const MOVEMENTS: Movement[] = [
-  { id: 1, date: '15 ene', time: '10:42', product: 'Pluma azul BIC', type: 'venta', qty: 5, stockBefore: 13, stockAfter: 8, user: 'Cajero 1', note: 'Venta #VTA-0091' },
-  { id: 2, date: '15 ene', time: '09:15', product: 'Cuaderno profesional 100h', type: 'entrada', qty: 30, stockBefore: 18, stockAfter: 48, user: 'Admin', note: 'Compra proveedor' },
-  { id: 3, date: '14 ene', time: '17:30', product: 'Lápiz HB #2', type: 'venta', qty: 12, stockBefore: 12, stockAfter: 0, user: 'Cajero 2', note: 'Venta #VTA-0088' },
-  { id: 4, date: '14 ene', time: '15:20', product: 'Folder tamaño carta', type: 'venta', qty: 8, stockBefore: 42, stockAfter: 34, user: 'Cajero 1', note: 'Venta #VTA-0085' },
-  { id: 5, date: '14 ene', time: '11:05', product: 'Cartulina blanca', type: 'ajuste', qty: 4, stockBefore: 10, stockAfter: 6, user: 'Admin', note: 'Conteo físico corregido' },
-  { id: 6, date: '13 ene', time: '16:45', product: 'Tijeras escolares', type: 'merma', qty: 2, stockBefore: 6, stockAfter: 4, user: 'Admin', note: 'Defecto de fábrica' },
-  { id: 7, date: '13 ene', time: '14:20', product: 'Marcador permanente negro', type: 'entrada', qty: 24, stockBefore: 0, stockAfter: 24, user: 'Admin', note: 'Compra proveedor' },
-  { id: 8, date: '13 ene', time: '10:10', product: 'Cinta adhesiva (rollo)', type: 'venta', qty: 3, stockBefore: 31, stockAfter: 28, user: 'Cajero 1', note: 'Venta #VTA-0079' },
-]
-
-const PRODUCTS: ProductRow[] = [
-  { id: 1,  name: 'Cuaderno profesional 100h', sku: 'CUA-100', category: 'Cuadernos',    stock: 48, stockMin: 20, stockMax: 100, cost: 1800,  price: 3500,  consumption: 23, lastMove: '15 ene', status: 'ok'  },
-  { id: 2,  name: 'Pluma azul BIC (pza)',       sku: 'PLU-AZU', category: 'Escritura',    stock: 8,  stockMin: 50, stockMax: 200, cost: 200,   price: 500,   consumption: 87, lastMove: '15 ene', status: 'low' },
-  { id: 3,  name: 'Lápiz HB #2 (pza)',          sku: 'LAP-HB2', category: 'Escritura',    stock: 0,  stockMin: 30, stockMax: 150, cost: 150,   price: 350,   consumption: 65, lastMove: '14 ene', status: 'out' },
-  { id: 4,  name: 'Hojas blancas (resma 500)',  sku: 'HOJ-500', category: 'Papel',        stock: 22, stockMin: 10, stockMax: 50,  cost: 8500,  price: 13000, consumption: 12, lastMove: '14 ene', status: 'ok'  },
-  { id: 5,  name: 'Cartulina blanca (pza)',      sku: 'CAR-BLA', category: 'Papel',        stock: 6,  stockMin: 15, stockMax: 60,  cost: 600,   price: 1200,  consumption: 18, lastMove: '14 ene', status: 'low' },
-  { id: 6,  name: 'Folder tamaño carta (pza)',  sku: 'FOL-CAR', category: 'Organización', stock: 34, stockMin: 20, stockMax: 80,  cost: 400,   price: 800,   consumption: 31, lastMove: '14 ene', status: 'ok'  },
-  { id: 7,  name: 'Pegamento en barra (pza)',   sku: 'PEG-BAR', category: 'Adhesivos',    stock: 15, stockMin: 10, stockMax: 40,  cost: 500,   price: 1200,  consumption: 9,  lastMove: '12 ene', status: 'ok'  },
-  { id: 8,  name: 'Tijeras escolares (pza)',    sku: 'TIJ-ESC', category: 'Herramientas', stock: 4,  stockMin: 10, stockMax: 30,  cost: 1200,  price: 2500,  consumption: 7,  lastMove: '13 ene', status: 'low' },
-  { id: 9,  name: 'Marcador permanente negro',  sku: 'MAR-NEG', category: 'Escritura',    stock: 24, stockMin: 15, stockMax: 60,  cost: 600,   price: 1500,  consumption: 14, lastMove: '13 ene', status: 'ok'  },
-  { id: 10, name: 'Colores madera (caja 12)',   sku: 'COL-12C', category: 'Arte',         stock: 12, stockMin: 8,  stockMax: 40,  cost: 2200,  price: 4500,  consumption: 8,  lastMove: '14 ene', status: 'ok'  },
-  { id: 11, name: 'Engrapadora escritorio',     sku: 'ENG-MED', category: 'Herramientas', stock: 3,  stockMin: 5,  stockMax: 15,  cost: 8000,  price: 18000, consumption: 2,  lastMove: '28 dic', status: 'low' },
-  { id: 12, name: 'Cinta adhesiva (rollo)',     sku: 'CIN-TRA', category: 'Adhesivos',    stock: 28, stockMin: 15, stockMax: 60,  cost: 300,   price: 700,   consumption: 22, lastMove: '13 ene', status: 'ok'  },
-]
-
-const ALERTS: AlertItem[] = [
-  { id: 1, level: 'critical', product: 'Pluma azul BIC',          message: 'Stock crítico — 8 uds (mínimo 50). Requiere reabastecimiento urgente.' },
-  { id: 2, level: 'critical', product: 'Lápiz HB #2',             message: 'Sin existencias. Artículo agotado desde el 14 de enero.' },
-  { id: 3, level: 'warning',  product: 'Cartulina blanca',         message: 'Stock bajo — 6 uds (mínimo 15). Considera reabastecer pronto.' },
-  { id: 4, level: 'warning',  product: 'Tijeras escolares',        message: 'Stock bajo — 4 uds (mínimo 10). Última merma: 2 pzas defectuosas.' },
-  { id: 5, level: 'warning',  product: 'Engrapadora escritorio',   message: 'Stock bajo — 3 uds (mínimo 5). Sin movimiento en 18 días.' },
-  { id: 6, level: 'info',     product: 'Pluma azul BIC',           message: 'Consumo acelerado: 87 unidades vendidas esta semana (+40% vs semana anterior).' },
-  { id: 7, level: 'info',     product: 'Cuaderno profesional 100h',message: 'Reabastecimiento reciente: +30 unidades ingresadas hoy por compra a proveedor.' },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -83,9 +21,10 @@ function fmt(centavos: number): string {
   return `$${(centavos / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-function fmtShort(pesos: number): string {
-  if (pesos >= 1000) return `$${(pesos / 1000).toFixed(1)}k`
-  return `$${pesos.toFixed(0)}`
+function fmtShort(val: number): string {
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
+  if (val >= 1_000)     return `$${(val / 1_000).toFixed(1)}k`
+  return `$${val.toFixed(0)}`
 }
 
 function margin(cost: number, price: number): number {
@@ -93,7 +32,7 @@ function margin(cost: number, price: number): number {
   return Math.round(((price - cost) / price) * 100)
 }
 
-// ─── KpiCard ──────────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 type KpiCardProps = { label: string; value: string; change: number; icon: JSX.Element; accent: string }
 
@@ -114,8 +53,6 @@ function KpiCard({ label, value, change, icon, accent }: KpiCardProps): JSX.Elem
   )
 }
 
-// ─── Badges ───────────────────────────────────────────────────────────────────
-
 function MoveBadge({ type }: { type: MoveType }): JSX.Element {
   const map: Record<MoveType, string> = {
     entrada: 'Entrada', venta: 'Venta', ajuste: 'Ajuste', merma: 'Merma', devolucion: 'Devolución'
@@ -126,30 +63,28 @@ function MoveBadge({ type }: { type: MoveType }): JSX.Element {
 function StatusBadge({ status }: { status: StockStatus }): JSX.Element {
   const map: Record<StockStatus, [string, string]> = {
     ok:  ['Disponible', styles.statusOk],
-    low: ['Stock bajo', styles.statusLow],
-    out: ['Agotado',    styles.statusOut],
+    low: ['Stock bajo',  styles.statusLow],
+    out: ['Agotado',     styles.statusOut],
   }
   const [label, cls] = map[status]
   return <span className={`${styles.statusBadge} ${cls}`}>{label}</span>
 }
 
-// ─── BarChart (SVG) ───────────────────────────────────────────────────────────
-
-function BarChart({ data, mode }: { data: ChartPoint[]; mode: ChartMode }): JSX.Element {
+function BarChart({ data, mode }: { data: InventoryChartPoint[]; mode: ChartMode }): JSX.Element {
   const W = 520, H = 160, PL = 40, PR = 12, PT = 12, PB = 24
   const cW = W - PL - PR
   const cH = H - PT - PB
-  const n = data.length
+  const n  = data.length || 1
   const slotW = cW / n
-  const bW = Math.floor(slotW * 0.52)
-  const maxVal = Math.max(...data.flatMap(d =>
-    mode === 'profit' ? [d.profit] : mode === 'sales' ? [d.sales] : [d.sales, d.profit]
-  )) || 1
-
+  const bW    = Math.floor(slotW * 0.52)
+  const maxVal = Math.max(
+    ...data.flatMap(d =>
+      mode === 'profit' ? [d.profit] : mode === 'sales' ? [d.sales] : [d.sales, d.profit]
+    ), 1
+  )
   const bH = (v: number) => (v / maxVal) * cH
   const bX = (i: number) => PL + i * slotW + (slotW - bW) / 2
   const bY = (v: number) => PT + cH - bH(v)
-
   const ticks = [0, 0.33, 0.66, 1]
 
   return (
@@ -163,25 +98,24 @@ function BarChart({ data, mode }: { data: ChartPoint[]; mode: ChartMode }): JSX.
           </g>
         )
       })}
-
       {data.map((d, i) => {
-        const isToday = i === data.length - 1
-        const x = bX(i)
+        const isLast = i === data.length - 1
+        const x    = bX(i)
         const half = Math.floor(bW * 0.46)
         return (
           <g key={i}>
             {(mode === 'sales' || mode === 'both') && (
               <rect x={mode === 'both' ? x : x} y={bY(d.sales)}
                 width={mode === 'both' ? half : bW} height={Math.max(2, bH(d.sales))}
-                rx="3" fill={isToday ? '#818cf8' : '#4f6ef7'} opacity="0.88" />
+                rx="3" fill={isLast ? '#818cf8' : '#4f6ef7'} opacity="0.88" />
             )}
             {(mode === 'profit' || mode === 'both') && (
               <rect x={mode === 'both' ? x + half + 2 : x} y={bY(d.profit)}
                 width={mode === 'both' ? half : bW} height={Math.max(2, bH(d.profit))}
-                rx="3" fill={isToday ? '#6ee7b7' : '#10b981'} opacity="0.88" />
+                rx="3" fill={isLast ? '#6ee7b7' : '#10b981'} opacity="0.88" />
             )}
             <text x={x + bW / 2} y={H - 6} textAnchor="middle" fontSize="9"
-              fill={isToday ? '#4f6ef7' : '#9ca3af'} fontWeight={isToday ? 700 : 400}>
+              fill={isLast ? '#4f6ef7' : '#9ca3af'} fontWeight={isLast ? 700 : 400}>
               {d.label}
             </text>
           </g>
@@ -191,86 +125,309 @@ function BarChart({ data, mode }: { data: ChartPoint[]; mode: ChartMode }): JSX.
   )
 }
 
+// ─── Movement modal ───────────────────────────────────────────────────────────
+
+const MOVE_TYPES = [
+  { value: 'entrada',   label: 'Entrada',    sub: 'Reabastecimiento / compra' },
+  { value: 'ajuste',    label: 'Ajuste',     sub: 'Conteo físico / corrección' },
+  { value: 'merma',     label: 'Merma',      sub: 'Daño o pérdida' },
+  { value: 'devolucion',label: 'Devolución', sub: 'Regreso de cliente' },
+] as const
+
+type MovementModalProps = {
+  products: InventoryProduct[]
+  userId: number
+  onClose: () => void
+  onSaved: () => void
+}
+
+function MovementModal({ products, userId, onClose, onSaved }: MovementModalProps): JSX.Element {
+  const [search, setSearch]       = useState('')
+  const [productId, setProductId] = useState<number | null>(null)
+  const [type, setType]   = useState<'entrada' | 'ajuste' | 'merma' | 'devolucion'>('entrada')
+  const [qty, setQty]     = useState(1)
+  const [note, setNote]   = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState<string | null>(null)
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return products
+    return products.filter(p =>
+      p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+    )
+  }, [products, search])
+
+  const selected = products.find(p => p.id === productId) ?? null
+
+  async function handleSave(): Promise<void> {
+    if (!productId) { setError('Selecciona un producto.'); return }
+    if (qty < 1)    { setError('La cantidad debe ser mayor a 0.'); return }
+    try {
+      setSaving(true)
+      await window.pos.inventory.registerMovement({ productId, type, qty, userId, note: note.trim() || undefined })
+      onSaved()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al registrar.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={styles.moveOverlay} onClick={onClose}>
+      <div className={styles.moveModal} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className={styles.moveModalHead}>
+          <div className={styles.moveModalTitle}>
+            <FiPlus size={17} />
+            Nuevo movimiento
+          </div>
+          <button type="button" className={styles.drawerClose} onClick={onClose}>
+            <FiX size={17} />
+          </button>
+        </div>
+
+        <div className={styles.moveModalBody}>
+          {/* Left: product picker */}
+          <div className={styles.movePickerCol}>
+            <div className={styles.movePickerLabel}>Producto</div>
+
+            {/* Search */}
+            <div className={styles.moveSearchWrap}>
+              <FiSearch size={14} className={styles.moveSearchIcon} />
+              <input
+                className={styles.moveSearchInput}
+                placeholder="Buscar por nombre o SKU…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                autoFocus
+              />
+              {search && (
+                <button className={styles.moveSearchClear} onClick={() => setSearch('')}>
+                  <FiX size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Product list */}
+            <div className={styles.moveProductList}>
+              {filtered.length === 0 ? (
+                <div className={styles.moveNoResults}>Sin resultados</div>
+              ) : filtered.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`${styles.moveProductItem} ${productId === p.id ? styles.moveProductItemActive : ''}`}
+                  onClick={() => setProductId(p.id)}
+                >
+                  <div className={styles.moveProductName}>{p.name}</div>
+                  <div className={styles.moveProductMeta}>
+                    <span className={styles.moveProductSku}>{p.sku}</span>
+                    <span className={`${styles.moveProductStock} ${p.status === 'out' ? styles.moveStockOut : p.status === 'low' ? styles.moveStockLow : styles.moveStockOk}`}>
+                      {p.stock} uds
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: form */}
+          <div className={styles.moveFormCol}>
+            {/* Selected product chip */}
+            <div className={styles.moveSelectedChip}>
+              {selected ? (
+                <>
+                  <span className={styles.moveSelectedName}>{selected.name}</span>
+                  <span className={`${styles.moveSelectedStock} ${selected.status === 'out' ? styles.moveStockOut : selected.status === 'low' ? styles.moveStockLow : styles.moveStockOk}`}>
+                    Stock: {selected.stock}
+                  </span>
+                </>
+              ) : (
+                <span className={styles.moveSelectHint}>← Selecciona un producto</span>
+              )}
+            </div>
+
+            {/* Type */}
+            <div className={styles.moveFieldLabel}>Tipo de movimiento</div>
+            <div className={styles.moveTypeGrid}>
+              {MOVE_TYPES.map(mt => (
+                <button
+                  key={mt.value}
+                  type="button"
+                  className={`${styles.moveTypeBtn} ${type === mt.value ? styles.moveTypeBtnActive : ''}`}
+                  onClick={() => setType(mt.value)}
+                  disabled={saving}
+                >
+                  <span className={styles.moveTypeBtnLabel}>{mt.label}</span>
+                  <span className={styles.moveTypeBtnSub}>{mt.sub}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Qty */}
+            <div className={styles.moveFieldLabel}>Cantidad</div>
+            <div className={styles.moveQtyWrap}>
+              <button type="button" className={styles.moveQtyBtn}
+                onClick={() => setQty(q => Math.max(1, q - 1))} disabled={saving}>−</button>
+              <input
+                type="number" min={1} value={qty}
+                onChange={e => setQty(Math.max(1, Number(e.target.value)))}
+                disabled={saving}
+                className={styles.moveQtyInput}
+              />
+              <button type="button" className={styles.moveQtyBtn}
+                onClick={() => setQty(q => q + 1)} disabled={saving}>+</button>
+            </div>
+
+            {/* Note */}
+            <div className={styles.moveFieldLabel}>Nota <span className={styles.moveFieldOptional}>(opcional)</span></div>
+            <input
+              className={styles.moveNoteInput}
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              disabled={saving}
+              placeholder="Proveedor, razón, folio…"
+            />
+
+            {error && <div className={styles.errorBanner}>{error}</div>}
+
+            {/* Footer */}
+            <div className={styles.moveFooter}>
+              <button type="button" className={styles.btnOutline} onClick={onClose} disabled={saving}>
+                Cancelar
+              </button>
+              <button type="button" className={styles.btnPrimary}
+                onClick={() => void handleSave()} disabled={saving || !productId}>
+                <FiSave size={13} />
+                {saving ? 'Guardando…' : 'Registrar movimiento'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function InventoryPage(): JSX.Element {
+type InventoryPageProps = { user: AuthUser }
+
+export default function InventoryPage({ user }: InventoryPageProps): JSX.Element {
   const [period, setPeriod] = useState<Period>('week')
   const [chartMode, setChartMode] = useState<ChartMode>('both')
   const [search, setSearch] = useState('')
   const [moveFilter, setMoveFilter] = useState<MoveType | 'all'>('all')
-  const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null)
+  const [showMoveModal, setShowMoveModal] = useState(false)
 
-  // KPI values keyed by period
-  const kpiRows = useMemo((): KpiCardProps[] => {
-    const byPeriod: Record<Period, KpiCardProps[]> = {
-      today: [
-        { label: 'Ventas hoy',          value: '$2,100.00',  change: 8.3,   icon: <FiShoppingBag size={16} />, accent: '#4f6ef7' },
-        { label: 'Ganancia hoy',         value: '$780.00',    change: 6.1,   icon: <FiDollarSign size={16} />,  accent: '#10b981' },
-        { label: 'Costo mercancía hoy',  value: '$1,320.00',  change: 9.0,   icon: <FiBox size={16} />,         accent: '#f59e0b' },
-        { label: 'Margen promedio hoy',  value: '37.1%',      change: -1.4,  icon: <FiBarChart2 size={16} />,   accent: '#8b5cf6' },
-        { label: 'Tickets del día',      value: '14',         change: 16.7,  icon: <FiActivity size={16} />,    accent: '#06b6d4' },
-        { label: 'Unidades vendidas',    value: '38',         change: 5.6,   icon: <FiPackage size={16} />,     accent: '#ec4899' },
-        { label: 'Productos stock bajo', value: '4',          change: 0,     icon: <FiAlertTriangle size={16}/>,accent: '#ef4444' },
-        { label: 'Movimientos hoy',      value: '12',         change: 33.3,  icon: <FiRefreshCw size={16} />,   accent: '#64748b' },
-      ],
-      week: [
-        { label: 'Ventas semana',        value: '$24,530.00', change: 12.1,  icon: <FiShoppingBag size={16} />, accent: '#4f6ef7' },
-        { label: 'Ganancia semana',      value: '$8,940.00',  change: 9.8,   icon: <FiDollarSign size={16} />,  accent: '#10b981' },
-        { label: 'Costo mercancía',      value: '$15,590.00', change: 13.8,  icon: <FiBox size={16} />,         accent: '#f59e0b' },
-        { label: 'Margen promedio',      value: '36.4%',      change: -1.1,  icon: <FiBarChart2 size={16} />,   accent: '#8b5cf6' },
-        { label: 'Tickets semana',       value: '81',         change: 8.0,   icon: <FiActivity size={16} />,    accent: '#06b6d4' },
-        { label: 'Unidades vendidas',    value: '214',        change: 10.2,  icon: <FiPackage size={16} />,     accent: '#ec4899' },
-        { label: 'Productos stock bajo', value: '4',          change: 33.3,  icon: <FiAlertTriangle size={16}/>,accent: '#ef4444' },
-        { label: 'Movimientos semana',   value: '47',         change: 4.4,   icon: <FiRefreshCw size={16} />,   accent: '#64748b' },
-      ],
-      month: [
-        { label: 'Ventas mes',           value: '$98,450.00', change: 4.7,   icon: <FiShoppingBag size={16} />, accent: '#4f6ef7' },
-        { label: 'Ganancia mes',         value: '$36,210.00', change: 3.2,   icon: <FiDollarSign size={16} />,  accent: '#10b981' },
-        { label: 'Costo mercancía',      value: '$62,240.00', change: 5.7,   icon: <FiBox size={16} />,         accent: '#f59e0b' },
-        { label: 'Margen promedio',      value: '36.8%',      change: -0.6,  icon: <FiBarChart2 size={16} />,   accent: '#8b5cf6' },
-        { label: 'Tickets mes',          value: '312',        change: 2.6,   icon: <FiActivity size={16} />,    accent: '#06b6d4' },
-        { label: 'Unidades vendidas',    value: '841',        change: 6.3,   icon: <FiPackage size={16} />,     accent: '#ec4899' },
-        { label: 'Productos stock bajo', value: '4',          change: 33.3,  icon: <FiAlertTriangle size={16}/>,accent: '#ef4444' },
-        { label: 'Movimientos mes',      value: '184',        change: -6.1,  icon: <FiRefreshCw size={16} />,   accent: '#64748b' },
-      ],
+  // ── Data state ──
+  const [products, setProducts]   = useState<InventoryProduct[]>([])
+  const [stats, setStats]         = useState<InventoryStats | null>(null)
+  const [chart, setChart]         = useState<InventoryChartPoint[]>([])
+  const [movements, setMovements] = useState<InventoryMovement[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState<string | null>(null)
+
+  async function loadAll(p: Period): Promise<void> {
+    setLoading(true)
+    setError(null)
+    try {
+      const [prods, st, ch, moves] = await Promise.all([
+        window.pos.inventory.products(),
+        window.pos.inventory.stats(p),
+        window.pos.inventory.chart(),
+        window.pos.inventory.movements(),
+      ])
+      setProducts(prods)
+      setStats(st)
+      setChart(ch)
+      setMovements(moves)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al cargar inventario.')
+    } finally {
+      setLoading(false)
     }
-    return byPeriod[period]
-  }, [period])
+  }
 
-  const filteredMovements = useMemo(() =>
-    MOVEMENTS.filter(m => moveFilter === 'all' || m.type === moveFilter),
-    [moveFilter]
-  )
+  useEffect(() => { void loadAll(period) }, [period]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function reloadMovements(filter: MoveType | 'all'): Promise<void> {
+    const moves = await window.pos.inventory.movements(filter === 'all' ? undefined : filter)
+    setMovements(moves)
+  }
+
+  function handleFilterChange(f: MoveType | 'all'): void {
+    setMoveFilter(f)
+    void reloadMovements(f)
+  }
+
+  // ── Derived ──
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return PRODUCTS
-    return PRODUCTS.filter(p =>
+    if (!term) return products
+    return products.filter(p =>
       p.name.toLowerCase().includes(term) ||
       p.sku.toLowerCase().includes(term) ||
       p.category.toLowerCase().includes(term)
     )
-  }, [search])
+  }, [products, search])
 
   const statusCounts = useMemo(() => ({
-    total: PRODUCTS.length,
-    ok:  PRODUCTS.filter(p => p.status === 'ok').length,
-    low: PRODUCTS.filter(p => p.status === 'low').length,
-    out: PRODUCTS.filter(p => p.status === 'out').length,
-  }), [])
+    total: products.length,
+    ok:    products.filter(p => p.status === 'ok').length,
+    low:   products.filter(p => p.status === 'low').length,
+    out:   products.filter(p => p.status === 'out').length,
+  }), [products])
 
   const consumption = useMemo(() => {
-    const sorted = [...PRODUCTS].sort((a, b) => b.consumption - a.consumption).slice(0, 8)
+    const sorted = [...products].sort((a, b) => b.consumption - a.consumption).slice(0, 8)
     const max = sorted[0]?.consumption || 1
     return sorted.map(p => ({ name: p.name, units: p.consumption, pct: Math.round((p.consumption / max) * 100) }))
-  }, [])
+  }, [products])
 
   const moveSummary = useMemo(() => ({
-    entradas:   MOVEMENTS.filter(m => m.type === 'entrada').length,
-    ventas:     MOVEMENTS.filter(m => m.type === 'venta').length,
-    ajustes:    MOVEMENTS.filter(m => m.type === 'ajuste').length,
-    mermas:     MOVEMENTS.filter(m => m.type === 'merma').length,
-  }), [])
+    entradas:  movements.filter(m => m.type === 'entrada').length,
+    ventas:    movements.filter(m => m.type === 'venta').length,
+    ajustes:   movements.filter(m => m.type === 'ajuste').length,
+    mermas:    movements.filter(m => m.type === 'merma').length,
+  }), [movements])
+
+  const alerts = useMemo(() =>
+    products
+      .filter(p => p.status !== 'ok')
+      .map(p => ({
+        id: p.id,
+        level: p.status === 'out' ? ('critical' as const) : ('warning' as const),
+        product: p.name,
+        message: p.status === 'out'
+          ? `Sin existencias. Requiere reabastecimiento urgente.`
+          : `Stock bajo — ${p.stock} uds (mínimo ${p.stockMin}). Considera reabastecer.`,
+      })),
+    [products]
+  )
+
+  const kpiRows = useMemo((): KpiCardProps[] => {
+    if (!stats) return []
+    const c = stats.changes
+    const periodLabel = period === 'today' ? 'hoy' : period === 'week' ? 'semana' : 'mes'
+    return [
+      { label: `Ventas ${periodLabel}`,        value: fmt(stats.ventas),           change: c.ventas,      icon: <FiShoppingBag size={16} />, accent: '#4f6ef7' },
+      { label: `Ganancia ${periodLabel}`,       value: fmt(stats.ganancia),         change: c.ganancia,    icon: <FiDollarSign size={16} />,  accent: '#10b981' },
+      { label: 'Costo mercancía',              value: fmt(stats.costo),            change: c.costo,       icon: <FiBox size={16} />,         accent: '#f59e0b' },
+      { label: 'Margen promedio',              value: `${stats.margen}%`,          change: c.margen,      icon: <FiBarChart2 size={16} />,   accent: '#8b5cf6' },
+      { label: `Tickets ${periodLabel}`,        value: String(stats.tickets),       change: c.tickets,     icon: <FiActivity size={16} />,    accent: '#06b6d4' },
+      { label: 'Unidades vendidas',            value: String(stats.unidades),      change: c.unidades,    icon: <FiPackage size={16} />,     accent: '#ec4899' },
+      { label: 'Productos stock bajo',         value: String(stats.bajos),         change: 0,             icon: <FiAlertTriangle size={16}/>,accent: '#ef4444' },
+      { label: 'Movimientos manuales',         value: String(stats.movimientos),   change: c.movimientos, icon: <FiRefreshCw size={16} />,   accent: '#64748b' },
+    ]
+  }, [stats, period])
+
+  const canManage = user.role === 'ADMIN' || user.role === 'SUPERVISOR'
 
   return (
     <section className={styles.page}>
@@ -287,7 +444,7 @@ export default function InventoryPage(): JSX.Element {
               <FiSearch size={14} className={styles.searchIcon} />
               <input
                 className={styles.searchInput}
-                placeholder="Buscar producto, SKU o código…"
+                placeholder="Buscar producto, SKU o categoría…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -301,23 +458,34 @@ export default function InventoryPage(): JSX.Element {
                 </button>
               ))}
             </div>
-            <button type="button" className={styles.btnOutline}><FiDownload size={14} /> Exportar</button>
-            <button type="button" className={styles.btnPrimary}><FiPlus size={14} /> Nuevo movimiento</button>
+            {canManage && (
+              <button type="button" className={styles.btnPrimary} onClick={() => setShowMoveModal(true)}>
+                <FiPlus size={14} /> Nuevo movimiento
+              </button>
+            )}
           </div>
         </div>
 
         {/* ── Scroll area ────────────────────────────────────── */}
         <div className={styles.scroll}>
 
+          {error && <div className={styles.errorBanner}>{error}</div>}
+
           {/* ── KPIs ─────────────────────────────────────────── */}
           <div className={styles.kpiGrid}>
-            {kpiRows.map((k, i) => <KpiCard key={i} {...k} />)}
+            {loading
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={styles.kpiCard} style={{ borderTop: '3px solid #e2e8f0' }}>
+                    <div className={styles.kpiLabel} style={{ color: '#cbd5e1' }}>Cargando…</div>
+                    <div className={styles.kpiValue} style={{ color: '#e2e8f0' }}>—</div>
+                  </div>
+                ))
+              : kpiRows.map((k, i) => <KpiCard key={i} {...k} />)
+            }
           </div>
 
           {/* ── Analytics + Movement summary ─────────────────── */}
           <div className={styles.analyticsRow}>
-
-            {/* Chart card */}
             <div className={styles.card}>
               <div className={styles.cardHead}>
                 <div>
@@ -334,25 +502,17 @@ export default function InventoryPage(): JSX.Element {
                   ))}
                 </div>
               </div>
-              <BarChart data={CHART_DATA} mode={chartMode} />
-              {chartMode !== 'profit' && (
-                <div className={styles.chartLegend}>
-                  <span className={styles.legendDot} style={{ background: '#4f6ef7' }} /> Ventas
-                  {chartMode === 'both' && <><span className={styles.legendDot} style={{ background: '#10b981' }} /> Ganancia</>}
-                </div>
-              )}
-              {chartMode === 'profit' && (
-                <div className={styles.chartLegend}>
-                  <span className={styles.legendDot} style={{ background: '#10b981' }} /> Ganancia
-                </div>
-              )}
+              <BarChart data={chart} mode={chartMode} />
+              <div className={styles.chartLegend}>
+                {chartMode !== 'profit' && <><span className={styles.legendDot} style={{ background: '#4f6ef7' }} /> Ventas</>}
+                {chartMode !== 'sales'  && <><span className={styles.legendDot} style={{ background: '#10b981' }} /> Ganancia</>}
+              </div>
             </div>
 
-            {/* Movement summary */}
             <div className={styles.card}>
               <div className={styles.cardHead}>
                 <div className={styles.cardTitle}>Resumen de movimientos</div>
-                <div className={styles.cardSub}>Semana actual</div>
+                <div className={styles.cardSub}>Registros visibles</div>
               </div>
               <div className={styles.moveSummaryGrid}>
                 <div className={`${styles.moveSummaryCard} ${styles.moveCardEntrada}`}>
@@ -379,19 +539,19 @@ export default function InventoryPage(): JSX.Element {
             </div>
           </div>
 
-          {/* ── Recent movements table ────────────────────────── */}
+          {/* ── Movements table ───────────────────────────────── */}
           <div className={styles.card}>
             <div className={styles.cardHead}>
               <div>
                 <div className={styles.cardTitle}>Movimientos recientes</div>
-                <div className={styles.cardSub}>{filteredMovements.length} registros</div>
+                <div className={styles.cardSub}>{movements.length} registros</div>
               </div>
               <div className={styles.moveFilterRow}>
                 <FiFilter size={13} style={{ color: '#9ca3af' }} />
                 {(['all', 'entrada', 'venta', 'ajuste', 'merma'] as const).map(t => (
                   <button key={t} type="button"
                     className={`${styles.moveFilterBtn} ${moveFilter === t ? styles.moveFilterActive : ''}`}
-                    onClick={() => setMoveFilter(t)}>
+                    onClick={() => handleFilterChange(t)}>
                     {t === 'all' ? 'Todos' : t === 'entrada' ? 'Entradas' : t === 'venta' ? 'Ventas' : t === 'ajuste' ? 'Ajustes' : 'Mermas'}
                   </button>
                 ))}
@@ -405,16 +565,26 @@ export default function InventoryPage(): JSX.Element {
                 <div className={styles.tCenter}>Después</div>
                 <div>Usuario</div><div>Nota</div>
               </div>
-              {filteredMovements.map(m => (
+              {loading ? (
+                <div className={styles.tableRow}>
+                  <div className={styles.muted} style={{ gridColumn: '1 / -1' }}>Cargando movimientos…</div>
+                </div>
+              ) : movements.length === 0 ? (
+                <div className={styles.tableRow}>
+                  <div className={styles.muted} style={{ gridColumn: '1 / -1' }}>Sin movimientos registrados.</div>
+                </div>
+              ) : movements.map(m => (
                 <div key={m.id} className={styles.tableRow}>
-                  <div className={styles.cellDate}><span>{m.date}</span><span className={styles.cellTime}>{m.time}</span></div>
+                  <div className={styles.cellDate}>
+                    <span>{m.date}</span><span className={styles.cellTime}>{m.time}</span>
+                  </div>
                   <div className={styles.cellName}>{m.product}</div>
                   <div><MoveBadge type={m.type} /></div>
-                  <div className={`${styles.tCenter} ${m.type === 'entrada' ? styles.qtyIn : styles.qtyOut}`}>
-                    {m.type === 'entrada' ? '+' : '-'}{m.qty}
+                  <div className={`${styles.tCenter} ${m.type === 'entrada' || m.type === 'devolucion' ? styles.qtyIn : styles.qtyOut}`}>
+                    {m.type === 'entrada' || m.type === 'devolucion' ? '+' : '-'}{m.qty}
                   </div>
-                  <div className={`${styles.tCenter} ${styles.muted}`}>{m.stockBefore}</div>
-                  <div className={`${styles.tCenter} ${styles.muted}`}>{m.stockAfter}</div>
+                  <div className={`${styles.tCenter} ${styles.muted}`}>{m.stockBefore ?? '—'}</div>
+                  <div className={`${styles.tCenter} ${styles.muted}`}>{m.stockAfter ?? '—'}</div>
                   <div className={styles.muted}>{m.user}</div>
                   <div className={`${styles.muted} ${styles.cellNote}`}>{m.note}</div>
                 </div>
@@ -424,8 +594,6 @@ export default function InventoryPage(): JSX.Element {
 
           {/* ── Consumption + Inventory status ───────────────── */}
           <div className={styles.twoColRow}>
-
-            {/* Consumption */}
             <div className={styles.card}>
               <div className={styles.cardHead}>
                 <div>
@@ -447,10 +615,14 @@ export default function InventoryPage(): JSX.Element {
                     <span className={styles.consumUnits}>{c.units} uds</span>
                   </div>
                 ))}
+                {consumption.length === 0 && !loading && (
+                  <div className={styles.muted} style={{ padding: '12px 0', fontSize: 13 }}>
+                    Sin ventas registradas en los últimos 30 días.
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Inventory status */}
             <div className={styles.card}>
               <div className={styles.cardHead}>
                 <div>
@@ -475,32 +647,34 @@ export default function InventoryPage(): JSX.Element {
                 </div>
               </div>
 
-              {/* Visual bar distribution */}
-              <div className={styles.statusBar}>
-                <div className={styles.statusBarOk}
-                  style={{ flex: statusCounts.ok }}
-                  title={`${statusCounts.ok} disponibles`} />
-                <div className={styles.statusBarLow}
-                  style={{ flex: statusCounts.low }}
-                  title={`${statusCounts.low} stock bajo`} />
-                <div className={styles.statusBarOut}
-                  style={{ flex: Math.max(statusCounts.out, 0.3) }}
-                  title={`${statusCounts.out} agotados`} />
-              </div>
-              <div className={styles.statusBarLabels}>
-                <span style={{ color: '#10b981' }}>Disponible {Math.round((statusCounts.ok / statusCounts.total) * 100)}%</span>
-                <span style={{ color: '#f59e0b' }}>Bajo {Math.round((statusCounts.low / statusCounts.total) * 100)}%</span>
-                <span style={{ color: '#ef4444' }}>Agotado {Math.round((statusCounts.out / statusCounts.total) * 100)}%</span>
-              </div>
+              {statusCounts.total > 0 && (
+                <>
+                  <div className={styles.statusBar}>
+                    <div className={styles.statusBarOk}  style={{ flex: Math.max(statusCounts.ok,  0.1) }} />
+                    <div className={styles.statusBarLow} style={{ flex: Math.max(statusCounts.low, 0.1) }} />
+                    <div className={styles.statusBarOut} style={{ flex: Math.max(statusCounts.out, 0.1) }} />
+                  </div>
+                  <div className={styles.statusBarLabels}>
+                    <span style={{ color: '#10b981' }}>Disponible {Math.round((statusCounts.ok  / statusCounts.total) * 100)}%</span>
+                    <span style={{ color: '#f59e0b' }}>Bajo {Math.round((statusCounts.low / statusCounts.total) * 100)}%</span>
+                    <span style={{ color: '#ef4444' }}>Agotado {Math.round((statusCounts.out / statusCounts.total) * 100)}%</span>
+                  </div>
+                </>
+              )}
 
               <div className={styles.statusList}>
-                {PRODUCTS.filter(p => p.status !== 'ok').map(p => (
+                {products.filter(p => p.status !== 'ok').map(p => (
                   <div key={p.id} className={styles.statusListItem}>
                     <StatusBadge status={p.status} />
                     <span className={styles.statusListName}>{p.name}</span>
                     <span className={styles.statusListStock}>{p.stock} uds</span>
                   </div>
                 ))}
+                {!loading && products.filter(p => p.status !== 'ok').length === 0 && (
+                  <div className={styles.muted} style={{ fontSize: 13, padding: '8px 0' }}>
+                    Todos los productos tienen stock suficiente.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -510,11 +684,14 @@ export default function InventoryPage(): JSX.Element {
             <div className={styles.cardHead}>
               <div>
                 <div className={styles.cardTitle}>Productos en inventario</div>
-                <div className={styles.cardSub}>{filteredProducts.length} de {PRODUCTS.length} productos</div>
+                <div className={styles.cardSub}>{filteredProducts.length} de {products.length} productos</div>
               </div>
               <div className={styles.tableActions}>
                 <button type="button" className={styles.btnOutline}><FiFilter size={13} /> Filtros</button>
                 <button type="button" className={styles.btnOutline}><FiChevronDown size={13} /> Categoría</button>
+                <button type="button" className={styles.btnOutline} onClick={() => void loadAll(period)}>
+                  <FiRefreshCw size={13} /> Recargar
+                </button>
               </div>
             </div>
             <div className={styles.tableWrap}>
@@ -529,7 +706,15 @@ export default function InventoryPage(): JSX.Element {
                 <div>Estado</div>
                 <div />
               </div>
-              {filteredProducts.map(p => (
+              {loading ? (
+                <div className={styles.productRow}>
+                  <div className={styles.muted} style={{ gridColumn: '1 / -1' }}>Cargando productos…</div>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className={styles.productRow}>
+                  <div className={styles.muted} style={{ gridColumn: '1 / -1' }}>Sin productos encontrados.</div>
+                </div>
+              ) : filteredProducts.map(p => (
                 <div key={p.id} className={`${styles.productRow} ${p.status === 'out' ? styles.rowOut : p.status === 'low' ? styles.rowLow : ''}`}>
                   <div className={styles.cellName}>{p.name}</div>
                   <div className={styles.cellSku}>{p.sku}</div>
@@ -550,9 +735,6 @@ export default function InventoryPage(): JSX.Element {
                     <button type="button" className={styles.rowBtn} title="Ver detalle" onClick={() => setSelectedProduct(p)}>
                       <FiEye size={13} />
                     </button>
-                    <button type="button" className={styles.rowBtn} title="Editar">
-                      <FiEdit2 size={13} />
-                    </button>
                   </div>
                 </div>
               ))}
@@ -564,12 +746,16 @@ export default function InventoryPage(): JSX.Element {
             <div className={styles.cardHead}>
               <div>
                 <div className={styles.cardTitle}>Alertas e insights</div>
-                <div className={styles.cardSub}>{ALERTS.length} avisos activos</div>
+                <div className={styles.cardSub}>{alerts.length} aviso{alerts.length !== 1 ? 's' : ''} activo{alerts.length !== 1 ? 's' : ''}</div>
               </div>
               <FiAlertTriangle size={16} style={{ color: '#f59e0b' }} />
             </div>
             <div className={styles.alertList}>
-              {ALERTS.map(a => (
+              {alerts.length === 0 ? (
+                <div className={styles.muted} style={{ padding: '12px 0', fontSize: 13 }}>
+                  Sin alertas activas. Todos los stocks están en niveles correctos.
+                </div>
+              ) : alerts.map(a => (
                 <div key={a.id} className={`${styles.alertItem} ${styles[`alert_${a.level}`]}`}>
                   <div className={styles.alertDot} />
                   <div className={styles.alertBody}>
@@ -577,7 +763,7 @@ export default function InventoryPage(): JSX.Element {
                     <span className={styles.alertMsg}>{a.message}</span>
                   </div>
                   {a.level === 'critical' && <span className={styles.alertTag}>Urgente</span>}
-                  {a.level === 'warning' && <span className={styles.alertTagWarn}>Atención</span>}
+                  {a.level === 'warning'  && <span className={styles.alertTagWarn}>Atención</span>}
                 </div>
               ))}
             </div>
@@ -586,7 +772,7 @@ export default function InventoryPage(): JSX.Element {
         </div>{/* end .scroll */}
       </div>{/* end .panel */}
 
-      {/* ── Product Detail Drawer ─────────────────────────── */}
+      {/* ── Product detail drawer ─────────────────────────── */}
       {selectedProduct && (
         <div className={styles.drawerBackdrop} onClick={() => setSelectedProduct(null)}>
           <div className={styles.drawer} onClick={e => e.stopPropagation()}>
@@ -600,7 +786,9 @@ export default function InventoryPage(): JSX.Element {
               </button>
             </div>
 
-            <StatusBadge status={selectedProduct.status} />
+            <div style={{ padding: '0 18px' }}>
+              <StatusBadge status={selectedProduct.status} />
+            </div>
 
             <div className={styles.drawerGrid}>
               <div className={styles.drawerStat}>
@@ -639,24 +827,24 @@ export default function InventoryPage(): JSX.Element {
                 <div className={styles.drawerConsumVal}>{selectedProduct.consumption}</div>
                 <span className={styles.muted}>unidades vendidas</span>
               </div>
-              <div className={styles.drawerTrack}>
-                <div className={styles.drawerTrackFill}
-                  style={{ width: `${Math.round((selectedProduct.consumption / 87) * 100)}%` }} />
-              </div>
             </div>
 
             <div className={styles.drawerSection}>
               <div className={styles.drawerSectionTitle}>Movimientos recientes</div>
-              {MOVEMENTS.filter(m => m.product.toLowerCase().includes(selectedProduct.name.toLowerCase().split(' ')[0])).slice(0, 3).map(m => (
-                <div key={m.id} className={styles.drawerMoveRow}>
-                  <MoveBadge type={m.type} />
-                  <span className={styles.muted}>{m.date} {m.time}</span>
-                  <span className={`${m.type === 'entrada' ? styles.qtyIn : styles.qtyOut}`}>
-                    {m.type === 'entrada' ? '+' : '-'}{m.qty} uds
-                  </span>
-                </div>
-              ))}
-              {MOVEMENTS.filter(m => m.product.toLowerCase().includes(selectedProduct.name.toLowerCase().split(' ')[0])).length === 0 && (
+              {movements
+                .filter(m => m.product === selectedProduct.name)
+                .slice(0, 4)
+                .map(m => (
+                  <div key={m.id} className={styles.drawerMoveRow}>
+                    <MoveBadge type={m.type} />
+                    <span className={styles.muted}>{m.date} {m.time}</span>
+                    <span className={m.type === 'entrada' || m.type === 'devolucion' ? styles.qtyIn : styles.qtyOut}>
+                      {m.type === 'entrada' || m.type === 'devolucion' ? '+' : '-'}{m.qty} uds
+                    </span>
+                  </div>
+                ))
+              }
+              {movements.filter(m => m.product === selectedProduct.name).length === 0 && (
                 <p className={styles.muted}>Sin movimientos recientes registrados.</p>
               )}
             </div>
@@ -673,11 +861,28 @@ export default function InventoryPage(): JSX.Element {
             )}
 
             <div className={styles.drawerFooter}>
-              <button type="button" className={styles.btnOutline}><FiEdit2 size={13} /> Editar producto</button>
-              <button type="button" className={styles.btnPrimary}><FiPlus size={13} /> Registrar movimiento</button>
+              {canManage && (
+                <button type="button" className={styles.btnPrimary}
+                  onClick={() => { setSelectedProduct(null); setShowMoveModal(true) }}>
+                  <FiPlus size={13} /> Registrar movimiento
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── New movement modal ────────────────────────────── */}
+      {showMoveModal && (
+        <MovementModal
+          products={products}
+          userId={user.id}
+          onClose={() => setShowMoveModal(false)}
+          onSaved={async () => {
+            setShowMoveModal(false)
+            await loadAll(period)
+          }}
+        />
       )}
     </section>
   )

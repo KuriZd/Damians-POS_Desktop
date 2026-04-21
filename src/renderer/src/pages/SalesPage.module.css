@@ -983,3 +983,146 @@
   box-shadow: none;
   cursor: not-allowed;
 }
+
+/* ─── Historial Modal ─────────────────────────────────────────────────────── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.modalBox {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.2);
+  width: 100%;
+  max-width: 860px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1.5px solid #f0f2f8;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a2340;
+}
+
+.modalClose {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e6f0;
+  background: #f4f6fb;
+  color: #6a7190;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.modalClose:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.modalBody {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0;
+}
+
+.modalLoading,
+.modalEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px;
+  color: #9aa3bb;
+  font-size: 14px;
+}
+
+.histTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.histTable thead tr {
+  background: #f8f9fd;
+  border-bottom: 1.5px solid #e8ecf5;
+}
+
+.histTable th {
+  padding: 11px 16px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #7a84a1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.histTable tbody tr {
+  border-bottom: 1px solid #f0f2f8;
+  transition: background 0.1s;
+}
+
+.histTable tbody tr:last-child {
+  border-bottom: none;
+}
+
+.histTable tbody tr:hover {
+  background: #f8f9fd;
+}
+
+.histTable td {
+  padding: 11px 16px;
+  color: #374263;
+  white-space: nowrap;
+}
+
+.histFolio {
+  font-weight: 700;
+  color: #5b79ff;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.histCenter {
+  text-align: center;
+}
+
+.histColTotal,
+.histTotal {
+  text-align: right;
+}
+
+.histTotal {
+  font-weight: 700;
+  color: #1a2340;
+}

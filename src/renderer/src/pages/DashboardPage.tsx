@@ -1,174 +1,330 @@
-import { useState, type ReactElement } from 'react'
+import { useState, useEffect, type ReactElement } from 'react'
+import {
+  FiShoppingCart, FiTrendingUp, FiPackage, FiAlertTriangle,
+  FiRefreshCw, FiCalendar,
+} from 'react-icons/fi'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 import styles from './DashboardPage.module.css'
 
-type ProductLookup = Awaited<ReturnType<typeof window.pos.products.findByCode>>
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-type DashboardPageProps = {
-    user: AuthUser
+const fmt = (n: number) =>
+  n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
+
+function greeting(name: string): string {
+  const h = new Date().getHours()
+  if (h < 12) return `Buenos días, ${name}`
+  if (h < 19) return `Buenas tardes, ${name}`
+  return `Buenas noches, ${name}`
 }
 
-export default function DashboardPage({ user }: DashboardPageProps): ReactElement {
-    /*
-      Estado principal del dashboard.
-      Mantiene el mensaje del sistema, el último código leído
-      y el producto encontrado por el lector.
-    */
-    const [message, setMessage] = useState(`Bienvenido ${user.name}`)
-    const [lastCode, setLastCode] = useState('')
-    const [product, setProduct] = useState<ProductLookup>(null)
-    const [syncing, setSyncing] = useState(false)
+function todayLabel(): string {
+  return new Date().toLocaleDateString('es-MX', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
 
-    /*
-      Hook de captura para el lector de códigos de barras.
-      Si encuentra un producto en la base local, actualiza el panel derecho.
-    */
-    useBarcodeScanner(async (code) => {
-        setLastCode(code)
+// ─── Heatmap ─────────────────────────────────────────────────────────────────
 
-        try {
-            const found = await window.pos.products.findByCode(code)
-            setProduct(found)
+const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const WEEKS = 53
 
-            if (found) {
-                setMessage(`Producto encontrado: ${found.name}`)
-                return
-            }
+function buildGrid(heatmap: DashboardStats['heatmap']): { date: string; total: number }[][] {
+  const byDate = new Map(heatmap.map(r => [r.date, r.total]))
 
-            setMessage('No se encontró el producto')
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : 'No fue posible buscar el producto'
-            setMessage(msg)
-        }
-    })
+  // Find the Sunday on or before 364 days ago
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = new Date(today)
+  start.setDate(start.getDate() - 364)
+  start.setDate(start.getDate() - start.getDay()) // rewind to Sunday
 
-    /*
-      Sincronización manual del catálogo local.
-      Más adelante esto puede moverse a un servicio automático en segundo plano.
-    */
-    const handleSyncProducts = async (): Promise<void> => {
-        try {
-            setSyncing(true)
-            const result = await window.pos.sync.pullProducts()
-            setMessage(`Productos sincronizados: ${result.count}`)
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : 'No fue posible sincronizar productos'
-            setMessage(msg)
-        } finally {
-            setSyncing(false)
-        }
+  // Build WEEKS columns × 7 rows
+  const grid: { date: string; total: number }[][] = []
+  for (let w = 0; w < WEEKS; w++) {
+    const col: { date: string; total: number }[] = []
+    for (let d = 0; d < 7; d++) {
+      const cur = new Date(start)
+      cur.setDate(start.getDate() + w * 7 + d)
+      const iso = cur.toISOString().slice(0, 10)
+      col.push({ date: iso, total: byDate.get(iso) ?? 0 })
     }
+    grid.push(col)
+  }
+  return grid
+}
 
-    return (
-        <section className={styles.dashboard}>
-            <div className={styles.grid}>
-                <article className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div>
-                            <h2 className={styles.cardTitle}>Estado del sistema</h2>
-                            <p className={styles.cardSubtitle}>Mensaje operativo actual del POS</p>
-                        </div>
+function heatColor(total: number, max: number): string {
+  if (total === 0 || max === 0) return '#ebedf0'
+  const ratio = total / max
+  if (ratio <= 0.33) return '#fde8cc'
+  if (ratio <= 0.66) return '#f7a558'
+  return '#e8650a'
+}
 
-                        <button
-                            type="button"
-                            className={styles.syncButton}
-                            onClick={() => void handleSyncProducts()}
-                            disabled={syncing}
-                        >
-                            {syncing ? 'Sincronizando...' : 'Sincronizar'}
-                        </button>
-                    </div>
+type HeatmapProps = { heatmap: DashboardStats['heatmap'] }
 
-                    <div className={styles.messageBox}>
-                        <p className={styles.messageText}>{message}</p>
-                    </div>
-                </article>
+function Heatmap({ heatmap }: HeatmapProps): ReactElement {
+  const grid = buildGrid(heatmap)
+  const max  = Math.max(...heatmap.map(r => r.total), 1)
 
-                <article className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div>
-                            <h2 className={styles.cardTitle}>Escáner</h2>
-                            <p className={styles.cardSubtitle}>Último código recibido por el lector</p>
-                        </div>
-                    </div>
+  // Month labels: detect when month changes across weeks
+  const monthLabels: { label: string; col: number }[] = []
+  let lastMonth = -1
+  grid.forEach((col, wi) => {
+    const m = new Date(col[0].date).getMonth()
+    if (m !== lastMonth) {
+      monthLabels.push({ label: new Date(col[0].date).toLocaleDateString('es-MX', { month: 'short' }), col: wi })
+      lastMonth = m
+    }
+  })
 
-                    <div className={styles.codeBox}>
-                        <span className={styles.codeValue}>{lastCode || 'Esperando escaneo...'}</span>
-                    </div>
-                </article>
+  return (
+    <div className={styles.heatWrap}>
+      {/* Month axis */}
+      <div className={styles.heatMonths}>
+        {monthLabels.map(({ label, col }) => (
+          <span
+            key={col}
+            className={styles.heatMonth}
+            style={{ gridColumnStart: col + 1 }}
+          >
+            {label}
+          </span>
+        ))}
+      </div>
 
-                <article className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div>
-                            <h2 className={styles.cardTitle}>Producto detectado</h2>
-                            <p className={styles.cardSubtitle}>Consulta rápida del producto escaneado</p>
-                        </div>
-                    </div>
+      <div className={styles.heatGrid}>
+        {/* Day-of-week axis */}
+        <div className={styles.heatDays}>
+          {DAYS.map((d, i) => (
+            <span key={d} className={styles.heatDay} style={{ gridRow: i + 1 }}>{d}</span>
+          ))}
+        </div>
 
-                    {product ? (
-                        <div className={styles.productGrid}>
-                            <div className={styles.infoBox}>
-                                <span className={styles.infoLabel}>Nombre</span>
-                                <span className={styles.infoValue}>{product.name}</span>
-                            </div>
+        {/* Cells */}
+        <div className={styles.heatCells}>
+          {grid.map((col, wi) =>
+            col.map((cell, di) => {
+              const isFuture = new Date(cell.date) > new Date()
+              return (
+                <div
+                  key={`${wi}-${di}`}
+                  className={styles.heatCell}
+                  style={{
+                    gridColumn: wi + 1,
+                    gridRow:    di + 1,
+                    background: isFuture ? 'transparent' : heatColor(cell.total, max),
+                  }}
+                  title={
+                    isFuture
+                      ? ''
+                      : cell.total > 0
+                        ? `${cell.date}: ${fmt(cell.total)}`
+                        : `${cell.date}: sin ventas`
+                  }
+                />
+              )
+            })
+          )}
+        </div>
+      </div>
 
-                            <div className={styles.infoBox}>
-                                <span className={styles.infoLabel}>SKU</span>
-                                <span className={styles.infoValue}>{product.sku}</span>
-                            </div>
+      {/* Legend */}
+      <div className={styles.heatLegend}>
+        <span className={styles.heatLegendLabel}>Menos</span>
+        {['#ebedf0', '#fde8cc', '#f7a558', '#e8650a'].map(c => (
+          <div key={c} className={styles.heatLegendCell} style={{ background: c }} />
+        ))}
+        <span className={styles.heatLegendLabel}>Más</span>
+      </div>
+    </div>
+  )
+}
 
-                            <div className={styles.infoBox}>
-                                <span className={styles.infoLabel}>Código</span>
-                                <span className={styles.infoValue}>{product.barcode ?? '-'}</span>
-                            </div>
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
 
-                            <div className={styles.infoBox}>
-                                <span className={styles.infoLabel}>Precio</span>
-                                <span className={styles.infoValue}>${(product.price / 100).toFixed(2)}</span>
-                            </div>
+type KpiCardProps = {
+  icon: ReactElement
+  label: string
+  value: string
+  sub?: string
+  accent?: string
+  alert?: boolean
+}
 
-                            <div className={styles.infoBox}>
-                                <span className={styles.infoLabel}>Stock</span>
-                                <span className={styles.infoValue}>{product.stock}</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className={styles.emptyState}>
-                            <p className={styles.emptyTitle}>Sin producto seleccionado</p>
-                            <p className={styles.emptyText}>
-                                Escanea un artículo con el lector para mostrar su información aquí.
-                            </p>
-                        </div>
-                    )}
-                </article>
+function KpiCard({ icon, label, value, sub, accent = '#5b79ff', alert }: KpiCardProps): ReactElement {
+  return (
+    <div className={`${styles.kpiCard} ${alert ? styles.kpiAlert : ''}`}>
+      <div className={styles.kpiIcon} style={{ background: `${accent}18`, color: accent }}>
+        {icon}
+      </div>
+      <div className={styles.kpiContent}>
+        <span className={styles.kpiLabel}>{label}</span>
+        <span className={styles.kpiValue}>{value}</span>
+        {sub && <span className={styles.kpiSub}>{sub}</span>}
+      </div>
+    </div>
+  )
+}
 
-                <article className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div>
-                            <h2 className={styles.cardTitle}>Acciones rápidas</h2>
-                            <p className={styles.cardSubtitle}>Base visual para módulos futuros</p>
-                        </div>
-                    </div>
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
-                    <div className={styles.quickActions}>
-                        <button type="button" className={styles.quickAction}>
-                            Nueva venta
-                        </button>
+type ProductLookup = Awaited<ReturnType<typeof window.pos.products.findByCode>>
 
-                        <button type="button" className={styles.quickAction}>
-                            Buscar producto
-                        </button>
+export default function DashboardPage({ user }: { user: AuthUser }): ReactElement {
+  const [stats, setStats]         = useState<DashboardStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [syncing, setSyncing]     = useState(false)
+  const [syncMsg, setSyncMsg]     = useState('')
+  const [lastCode, setLastCode]   = useState('')
+  const [product, setProduct]     = useState<ProductLookup>(null)
 
-                        <button type="button" className={styles.quickAction}>
-                            Ver inventario
-                        </button>
+  useEffect(() => {
+    void window.pos.dashboard.stats().then(s => {
+      setStats(s)
+      setStatsLoading(false)
+    }).catch(() => setStatsLoading(false))
+  }, [])
 
-                        <button type="button" className={styles.quickAction}>
-                            Historial de ventas
-                        </button>
-                    </div>
-                </article>
+  useBarcodeScanner(async (code) => {
+    setLastCode(code)
+    const found = await window.pos.products.findByCode(code).catch(() => null)
+    setProduct(found)
+  })
+
+  const handleSync = async (): Promise<void> => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const r = await window.pos.sync.pullAll()
+      setSyncMsg(`Sync OK — productos: ${r.counts.products}, servicios: ${r.counts.services}`)
+    } catch {
+      setSyncMsg('Error al sincronizar')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <div className={styles.page}>
+
+      {/* ── Greeting ── */}
+      <div className={styles.greetingRow}>
+        <div>
+          <h1 className={styles.greeting}>{greeting(user.name)}</h1>
+          <p className={styles.greetingSub}>
+            <FiCalendar size={13} />
+            {todayLabel()}
+          </p>
+        </div>
+        <button
+          className={styles.syncBtn}
+          onClick={() => void handleSync()}
+          disabled={syncing}
+        >
+          <FiRefreshCw size={14} style={syncing ? { animation: 'spin 1s linear infinite' } : {}} />
+          {syncing ? 'Sincronizando…' : 'Sincronizar'}
+        </button>
+      </div>
+
+      {syncMsg && <div className={styles.syncMsg}>{syncMsg}</div>}
+
+      {/* ── KPIs ── */}
+      {statsLoading ? (
+        <div className={styles.kpiSkeleton}>
+          {[0, 1, 2, 3].map(i => <div key={i} className={styles.kpiSkeletonCard} />)}
+        </div>
+      ) : stats ? (
+        <div className={styles.kpiRow}>
+          <KpiCard
+            icon={<FiShoppingCart size={20} />}
+            label="Ventas hoy"
+            value={fmt(stats.today.total)}
+            sub={`${stats.today.tickets} ticket${stats.today.tickets !== 1 ? 's' : ''}`}
+            accent="#5b79ff"
+          />
+          <KpiCard
+            icon={<FiTrendingUp size={20} />}
+            label="Ganancia hoy"
+            value={fmt(stats.todayProfit)}
+            sub={stats.today.total > 0 ? `${Math.round((stats.todayProfit / stats.today.total) * 100)}% margen` : undefined}
+            accent="#22c55e"
+          />
+          <KpiCard
+            icon={<FiShoppingCart size={20} />}
+            label="Ventas esta semana"
+            value={fmt(stats.week.total)}
+            sub={`${stats.week.tickets} ticket${stats.week.tickets !== 1 ? 's' : ''}`}
+            accent="#f7a558"
+          />
+          <KpiCard
+            icon={<FiAlertTriangle size={20} />}
+            label="Stock bajo / agotado"
+            value={String(stats.lowStock)}
+            sub={stats.lowStock > 0 ? 'productos requieren atención' : 'todo en orden'}
+            accent={stats.lowStock > 0 ? '#ef4444' : '#22c55e'}
+            alert={stats.lowStock > 0}
+          />
+        </div>
+      ) : null}
+
+      {/* ── Activity heatmap ── */}
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <span className={styles.cardTitle}>
+            <FiPackage size={15} />
+            Monitor de actividad — últimas 52 semanas
+          </span>
+        </div>
+        {stats
+          ? <Heatmap heatmap={stats.heatmap} />
+          : <div className={styles.heatEmpty}>Cargando datos…</div>
+        }
+      </div>
+
+      {/* ── Bottom row ── */}
+      <div className={styles.bottomRow}>
+        {/* Scanner */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle}>Escáner rápido</span>
+          </div>
+          <div className={styles.scannerArea}>
+            <div className={styles.codeBox}>
+              <span className={styles.codeLabel}>Último código</span>
+              <span className={styles.codeValue}>{lastCode || '—'}</span>
             </div>
-        </section>
-    )
+            {product ? (
+              <div className={styles.productInfo}>
+                <div className={styles.productRow}>
+                  <span className={styles.productLabel}>Nombre</span>
+                  <span className={styles.productValue}>{product.name}</span>
+                </div>
+                <div className={styles.productRow}>
+                  <span className={styles.productLabel}>SKU</span>
+                  <span className={styles.productValue}>{product.sku}</span>
+                </div>
+                <div className={styles.productRow}>
+                  <span className={styles.productLabel}>Precio</span>
+                  <span className={styles.productValue}>{fmt(product.price)}</span>
+                </div>
+                <div className={styles.productRow}>
+                  <span className={styles.productLabel}>Stock</span>
+                  <span className={`${styles.productValue} ${product.stock <= 0 ? styles.stockOut : product.stock <= 5 ? styles.stockLow : ''}`}>
+                    {product.stock} pzas
+                  </span>
+                </div>
+              </div>
+            ) : lastCode ? (
+              <p className={styles.notFound}>Producto no encontrado</p>
+            ) : (
+              <p className={styles.scanHint}>Escanea un código de barras para consultar el producto.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  )
 }

@@ -1,203 +1,407 @@
-/* src/renderer/src/pages/DashboardPage.module.css */
+/* ─── Page ───────────────────────────────────────────────────────────────── */
 
-/* ─── Shell ──────────────────────────────────────────────────── */
-.dashboard {
-    width: 100%;
-    min-width: 0;
-    padding: 24px;
-    /* ✅ antes sin padding */
-    box-sizing: border-box;
+.page {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: transparent;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
 }
 
-/* ─── Grid principal ─────────────────────────────────────────── */
-.grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* ─── Card ───────────────────────────────────────────────────── */
+/* ─── Greeting ───────────────────────────────────────────────────────────── */
+
+.greetingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.greeting {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a2340;
+  letter-spacing: -0.3px;
+}
+
+.greetingSub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #7a84a1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-transform: capitalize;
+}
+
+.syncBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1.5px solid #d7dbe6;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374263;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.syncBtn:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #5b79ff;
+  color: #5b79ff;
+}
+
+.syncBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.syncMsg {
+  font-size: 12.5px;
+  color: #5b79ff;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+/* ─── KPI row ────────────────────────────────────────────────────────────── */
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.kpiSkeleton {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.kpiSkeletonCard {
+  height: 92px;
+  border-radius: 14px;
+  background: linear-gradient(160deg,
+      #edf4fb 0%,
+      #dbe9f6 40%,
+      #f4ede6 75%,
+      #ead8c8 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.kpiCard {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+  border: 1.5px solid transparent;
+  transition: box-shadow 0.15s;
+}
+
+.kpiCard:hover {
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.1);
+}
+
+.kpiAlert {
+  border-color: #fecaca;
+  background: #fff8f8;
+}
+
+.kpiIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpiContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kpiLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #7a84a1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.kpiValue {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a2340;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+
+.kpiSub {
+  font-size: 11.5px;
+  color: #9aa3bb;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────────────── */
+
 .card {
-    background: #fafafa;
-    border: 1px solid #dadada;
-    border-radius: 18px;
-    padding: 18px;
-    box-sizing: border-box;
-    min-width: 0;
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
 }
 
 .cardHeader {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .cardTitle {
-    margin: 0;
-    font-size: 1.05rem;
-    font-weight: 600;
-    /* ✅ agregado */
-    color: #1f1f1f;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #374263;
 }
 
-.cardSubtitle {
-    margin: 6px 0 0;
-    font-size: 0.9rem;
-    color: #666666;
+/* ─── Heatmap ────────────────────────────────────────────────────────────── */
+
+.heatWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-x: auto;
 }
 
-/* ─── Sync button ────────────────────────────────────────────── */
-.syncButton {
-    height: 40px;
-    border: none;
-    border-radius: 10px;
-    padding: 0 14px;
-    background: #2d2d2d;
-    color: #ffffff;
-    font-size: 0.88rem;
-    /* ✅ agregado */
-    font-weight: 500;
-    /* ✅ agregado */
-    cursor: pointer;
-    transition: opacity 0.15s ease;
-    /* ✅ agregado */
+.heatMonths {
+  display: grid;
+  grid-template-columns: repeat(53, 13px);
+  gap: 3px;
+  padding-left: 34px;
 }
 
-.syncButton:hover {
-    opacity: 0.85;
-    /* ✅ agregado */
+.heatMonth {
+  font-size: 10px;
+  color: #9aa3bb;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.syncButton:disabled {
-    opacity: 0.5;
-    /* ✅ antes 0.7 */
-    cursor: not-allowed;
+.heatGrid {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
 }
 
-/* ─── Cajas de contenido ─────────────────────────────────────── */
-.messageBox,
-.codeBox,
-.emptyState {
-    background: #ffffff;
-    border: 1px solid #e2e2e2;
-    border-radius: 14px;
-    padding: 16px;
+.heatDays {
+  display: grid;
+  grid-template-rows: repeat(7, 13px);
+  gap: 3px;
+  flex-shrink: 0;
+  width: 28px;
 }
 
-.messageText {
-    margin: 0;
-    color: #333333;
-    line-height: 1.5;
+.heatDay {
+  font-size: 9.5px;
+  color: #9aa3bb;
+  display: flex;
+  align-items: center;
+  height: 13px;
+  font-weight: 600;
+}
+
+.heatCells {
+  display: grid;
+  grid-template-columns: repeat(53, 13px);
+  grid-template-rows: repeat(7, 13px);
+  gap: 3px;
+}
+
+.heatCell {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  cursor: default;
+  transition: opacity 0.1s;
+}
+
+.heatCell:hover {
+  opacity: 0.75;
+  outline: 1.5px solid rgba(0, 0, 0, 0.15);
+}
+
+.heatLegend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.heatLegendLabel {
+  font-size: 10px;
+  color: #9aa3bb;
+  font-weight: 600;
+}
+
+.heatLegendCell {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+
+.heatEmpty {
+  color: #9aa3bb;
+  font-size: 13px;
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* ─── Bottom row ─────────────────────────────────────────────────────────── */
+
+.bottomRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+/* ─── Scanner ────────────────────────────────────────────────────────────── */
+
+.scannerArea {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.codeBox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8f9fd;
+  border: 1.5px solid #e8ecf5;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.codeLabel {
+  font-size: 11.5px;
+  color: #9aa3bb;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .codeValue {
-    display: block;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #232323;
-    word-break: break-word;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a2340;
+  font-family: monospace;
+  word-break: break-all;
 }
 
-/* ─── Product grid ───────────────────────────────────────────── */
-.productGrid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+.productInfo {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 
-.infoBox {
-    background: #ffffff;
-    border: 1px solid #e2e2e2;
-    border-radius: 14px;
-    padding: 14px;
-    display: flex;
+.productRow {
+  background: #f8f9fd;
+  border: 1px solid #e8ecf5;
+  border-radius: 9px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.productLabel {
+  font-size: 10.5px;
+  color: #9aa3bb;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.productValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a2340;
+}
+
+.stockLow {
+  color: #f7a558;
+}
+
+.stockOut {
+  color: #ef4444;
+}
+
+.scanHint,
+.notFound {
+  font-size: 13px;
+  color: #9aa3bb;
+  margin: 0;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.notFound {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+
+  .kpiRow,
+  .kpiSkeleton {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+
+  .kpiRow,
+  .kpiSkeleton {
+    grid-template-columns: 1fr;
+  }
+
+  .greetingRow {
     flex-direction: column;
-    gap: 6px;
-}
-
-.infoLabel {
-    font-size: 0.82rem;
-    color: #727272;
-}
-
-.infoValue {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #222222;
-    word-break: break-word;
-}
-
-/* ─── Empty state ────────────────────────────────────────────── */
-.emptyTitle {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #262626;
-}
-
-.emptyText {
-    margin: 10px 0 0;
-    font-size: 0.9rem;
-    color: #6a6a6a;
-}
-
-/* ─── Quick actions ──────────────────────────────────────────── */
-.quickActions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.quickAction {
-    min-height: 52px;
-    border: 1px solid #e2e2e2;
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 12px 14px;
-    text-align: left;
-    font-size: 0.94rem;
-    font-weight: 600;
-    color: #262626;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
-    /* ✅ agregado */
-}
-
-.quickAction:hover {
-    background: #f4f4f4;
-    /* ✅ antes #fcfcfc — más visible */
-    border-color: #c8c8c8;
-    /* ✅ antes #d6d6d6 */
-}
-
-.quickAction:focus-visible {
-    outline: 2px solid #5b79ff;
-    /* ✅ agregado */
-    outline-offset: 2px;
-}
-
-/* ─── Responsive ─────────────────────────────────────────────── */
-@media (max-width: 1000px) {
-    .grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 720px) {
-    .dashboard {
-        padding: 16px;
-        /* ✅ agregado */
-    }
-
-    .cardHeader {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .productGrid,
-    .quickActions {
-        grid-template-calls: 1fr;
-    }
+    align-items: flex-start;
+  }
 }
