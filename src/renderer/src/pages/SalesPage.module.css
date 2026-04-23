@@ -241,37 +241,60 @@
 
 .card {
   position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  height: 118px;
+  overflow: visible;
+  transition: transform 0.12s;
+}
+
+.cardInner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 118px;
+  max-height: 118px;
+  overflow: hidden;
   background: #fafbff;
   border: 1.5px solid #eaedfa;
   border-radius: 12px;
   padding: 12px;
-  cursor: pointer;
-  text-align: left;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
-  min-height: 110px;
+  transition: max-height 0.28s ease, border-color 0.15s, box-shadow 0.15s;
+  z-index: 1;
 }
 
 .card:hover:not(:disabled) {
-  border-color: #5b79ff;
-  box-shadow: 0 4px 14px rgba(91, 121, 255, 0.14);
   transform: translateY(-1px);
+  z-index: 20;
+}
+
+.card:hover:not(:disabled) .cardInner {
+  max-height: 320px;
+  border-color: #5b79ff;
+  box-shadow: 0 8px 20px rgba(91, 121, 255, 0.18);
+  z-index: 10;
 }
 
 .card:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.cardService {
+.cardService .cardInner {
   background: #fdf8ff;
   border-color: #e8ddf6;
 }
 
-.cardService:hover:not(:disabled) {
+.cardService:hover:not(:disabled) .cardInner {
   border-color: #9b72e8;
-  box-shadow: 0 4px 14px rgba(155, 114, 232, 0.15);
+  box-shadow: 0 8px 20px rgba(155, 114, 232, 0.18);
 }
 
 .cardOut {
@@ -330,8 +353,17 @@
   font-weight: 600;
   color: #1a1f36;
   line-height: 1.3;
-  flex: 1;
   margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.card:hover .cardName {
+  display: block;
+  overflow: visible;
 }
 
 .cardSku {

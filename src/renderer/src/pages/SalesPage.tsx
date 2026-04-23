@@ -226,39 +226,41 @@ function ProductCard({ item, onAdd }: ProductCardProps): ReactElement {
       className={`${styles.card} ${item.type === 'service' ? styles.cardService : ''} ${outStock ? styles.cardOut : ''}`}
       onClick={() => !outStock && onAdd(item)}
       disabled={outStock}
-      title={outStock ? 'Sin existencias' : `Agregar ${item.name}`}
+      title={outStock ? 'Sin existencias' : undefined}
     >
-      <div className={styles.cardTop}>
-        <div className={`${styles.cardBadge} ${item.type === 'service' ? styles.cardBadgeSvc : styles.cardBadgeProd}`}>
-          {item.type === 'service'
-            ? <><FaHandshake size={10} /> Servicio</>
-            : <><AiOutlineProduct size={10} /> Producto</>}
+      <div className={styles.cardInner}>
+        <div className={styles.cardTop}>
+          <div className={`${styles.cardBadge} ${item.type === 'service' ? styles.cardBadgeSvc : styles.cardBadgeProd}`}>
+            {item.type === 'service'
+              ? <><FaHandshake size={10} /> Servicio</>
+              : <><AiOutlineProduct size={10} /> Producto</>}
+          </div>
+          {lowStock && !outStock && (
+            <span className={styles.cardLowStock}>Stock bajo</span>
+          )}
+          {outStock && (
+            <span className={styles.cardOutStock}>Sin stock</span>
+          )}
         </div>
-        {lowStock && !outStock && (
-          <span className={styles.cardLowStock}>Stock bajo</span>
-        )}
-        {outStock && (
-          <span className={styles.cardOutStock}>Sin stock</span>
-        )}
-      </div>
 
-      <p className={styles.cardName}>{item.name}</p>
-      <p className={styles.cardSku}>{item.sku ?? item.code}</p>
+        <p className={styles.cardName}>{item.name}</p>
+        <p className={styles.cardSku}>{item.sku ?? item.code}</p>
 
-      <div className={styles.cardBottom}>
-        <span className={styles.cardPrice}>{fmt(item.price)}</span>
-        {item.type === 'product' && item.stock !== undefined && (
-          <span className={`${styles.cardStock} ${lowStock ? styles.cardStockLow : ''}`}>
-            {item.stock} pzas
-          </span>
-        )}
-        {item.type === 'service' && (
-          <span className={styles.cardPerUnit}>por hoja</span>
-        )}
-      </div>
+        <div className={styles.cardBottom}>
+          <span className={styles.cardPrice}>{fmt(item.price)}</span>
+          {item.type === 'product' && item.stock !== undefined && (
+            <span className={`${styles.cardStock} ${lowStock ? styles.cardStockLow : ''}`}>
+              {item.stock} pzas
+            </span>
+          )}
+          {item.type === 'service' && (
+            <span className={styles.cardPerUnit}>por hoja</span>
+          )}
+        </div>
 
-      <div className={styles.cardAddBtn}>
-        <FiPlus size={14} />
+        <div className={styles.cardAddBtn}>
+          <FiPlus size={14} />
+        </div>
       </div>
     </button>
   )
