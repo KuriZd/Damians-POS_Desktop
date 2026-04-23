@@ -1,5 +1,7 @@
 import { ipcMain } from 'electron'
+import crypto from 'node:crypto'
 import { getLocalDb } from '../db/local-db'
+import { pushSaleToSupabase } from './sync.ipc'
 
 type SaleItemInput = {
   itemType: 'product' | 'service' | 'PRODUCT' | 'SERVICE'
@@ -14,9 +16,7 @@ type SaleItemInput = {
 type CreateSalePayload = {
   cashierId: number
   items: SaleItemInput[]
-  subtotal: number
-  tax: number
-  total: number
+  discount?: number
   payment: { method: string; amount: number }
 }
 
@@ -27,6 +27,26 @@ type ProductSnap = {
 type ServiceSnap = {
   id: number; code: string; name: string
   cost: number; taxRateBp: number; profitPctBp: number
+}
+type ServiceSupplySnap = {
+  productId: number
+  productPublicId: string
+  sku: string
+  name: string
+  cost: number
+  qty: number
+}
+
+function movementTypeFromSource(sourceType: string): 'IN' | 'OUT' {
+  switch (sourceType) {
+    case 'PURCHASE':
+    case 'OPENING_STOCK':
+    case 'RETURN':
+    case 'SALE_CANCEL':
+      return 'IN'
+    default:
+      return 'OUT'
+  }
 }
 
 function generateFolio(db: ReturnType<typeof getLocalDb>): string {
@@ -40,9 +60,12 @@ export function registerSalesIpc(): void {
     const now = new Date().toISOString()
     const salePublicId = crypto.randomUUID()
     const folio = generateFolio(db)
+    const saleColumns = db.prepare(`PRAGMA table_info("Sale")`).all() as Array<{ name: string }>
+    const hasLegacyTaxColumn = saleColumns.some((column) => column.name === 'tax')
 
     const productSnaps = new Map<string, ProductSnap>()
     const serviceSnaps = new Map<string, ServiceSnap>()
+    const serviceSupplies = new Map<string, ServiceSupplySnap[]>()
 
     for (const item of payload.items) {
       const type = item.itemType.toUpperCase()
@@ -61,17 +84,74 @@ export function registerSalesIpc(): void {
           SELECT id, code, name, cost, "taxRateBp", "profitPctBp"
           FROM "Service" WHERE "publicId" = ? LIMIT 1
         `).get(item.servicePublicId) as ServiceSnap | undefined
-        if (row) serviceSnaps.set(item.servicePublicId, row)
+        if (row) {
+          serviceSnaps.set(item.servicePublicId, row)
+
+          const supplies = db.prepare(`
+            SELECT
+              ss."productId" AS productId,
+              p."publicId"   AS productPublicId,
+              p.sku          AS sku,
+              p.name         AS name,
+              p.cost         AS cost,
+              ss.qty         AS qty
+            FROM "ServiceSupply" ss
+            JOIN "Product" p ON p.id = ss."productId"
+            WHERE ss."serviceId" = ?
+          `).all(row.id) as ServiceSupplySnap[]
+
+          serviceSupplies.set(item.servicePublicId, supplies)
+        }
       }
     }
 
+    // ── Pre-compute all line values (puntos 2, 3, 4) ─────────────────────────
+    type ComputedLine = {
+      item: SaleItemInput
+      type: 'PRODUCT' | 'SERVICE'
+      snap: ProductSnap | ServiceSnap | undefined
+      lineSubtotal: number
+      lineTax: number
+      lineCostTotal: number
+      lineProfit: number
+    }
+
+    let saleSubtotal = 0
+    const lines: ComputedLine[] = []
+
+    for (const item of payload.items) {
+      const type = item.itemType.toUpperCase() as 'PRODUCT' | 'SERVICE'
+      const snap: ProductSnap | ServiceSnap | undefined =
+        type === 'PRODUCT'
+          ? (item.productPublicId ? productSnaps.get(item.productPublicId) : undefined)
+          : (item.servicePublicId ? serviceSnaps.get(item.servicePublicId) : undefined)
+
+      const lineSubtotal  = item.lineTotal - (item.discount ?? 0)
+      const lineTax       = 0
+      const lineCostTotal = (snap?.cost ?? 0) * item.qty
+      const lineProfit    = lineSubtotal - lineCostTotal
+
+      saleSubtotal += lineSubtotal
+      lines.push({ item, type, snap, lineSubtotal, lineTax, lineCostTotal, lineProfit })
+    }
+
+    const saleTotal = saleSubtotal - (payload.discount ?? 0)
+
+    // ── Persist in a single transaction ──────────────────────────────────────
     db.transaction(() => {
-      db.prepare(`
-        INSERT INTO "Sale" ("publicId", folio, status, subtotal, tax, total,
-          "cashierId", "createdAt", "updatedAt")
-        VALUES (?, ?, 'COMPLETED', ?, ?, ?, ?, ?, ?)
-      `).run(salePublicId, folio, payload.subtotal, payload.tax, payload.total,
-             payload.cashierId, now, now)
+      if (hasLegacyTaxColumn) {
+        db.prepare(`
+          INSERT INTO "Sale" ("publicId", folio, status, subtotal, tax, total,
+            "cashierId", "createdAt", "updatedAt")
+          VALUES (?, ?, 'COMPLETED', ?, 0, ?, ?, ?, ?)
+        `).run(salePublicId, folio, saleSubtotal, saleTotal, payload.cashierId, now, now)
+      } else {
+        db.prepare(`
+          INSERT INTO "Sale" ("publicId", folio, status, subtotal, total,
+            "cashierId", "createdAt", "updatedAt")
+          VALUES (?, ?, 'COMPLETED', ?, ?, ?, ?, ?)
+        `).run(salePublicId, folio, saleSubtotal, saleTotal, payload.cashierId, now, now)
+      }
 
       const { id: saleId } = db.prepare(
         `SELECT id FROM "Sale" WHERE "publicId" = ?`
@@ -92,71 +172,133 @@ export function registerSalesIpc(): void {
 
       const insertMove = db.prepare(`
         INSERT INTO "InventoryMovement" (
-          "productId","originalProductId","sourceType",qty,
+          "publicId", type, "productId","originalProductId","sourceType","sourceId",qty,
+          reason,
           "stockBefore","stockAfter","userId","saleId","saleItemId",
           "productPublicIdSnapshot","productCodeSnapshot","productNameSnapshot",
-          "unitCostSnapshot","createdAt"
-        ) VALUES (?,?,'SALE',?, ?,?,?,?,?, ?,?,?, ?,?)
+          "unitCostSnapshot","originDeviceId","createdAt","updatedAt"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      const insertServiceConsumptionMove = db.prepare(`
+        INSERT INTO "InventoryMovement" (
+          "publicId", type, "productId","originalProductId","sourceType","sourceId",qty,
+          reason,
+          "stockBefore","stockAfter","userId","saleId","saleItemId","relatedServiceId",
+          "relatedServiceOriginalId",
+          "productPublicIdSnapshot","productCodeSnapshot","productNameSnapshot",
+          "relatedServiceNameSnapshot",
+          "unitCostSnapshot","metaJson","originDeviceId","createdAt","updatedAt"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const updateStock = db.prepare(
         `UPDATE "Product" SET stock = MAX(0, stock - ?), "updatedAt" = ? WHERE id = ?`
       )
 
-      for (const item of payload.items) {
-        const itemUid      = crypto.randomUUID()
-        const type         = item.itemType.toUpperCase() as 'PRODUCT' | 'SERVICE'
-        const lineSubtotal = item.lineTotal - (item.discount ?? 0)
+      for (const { item, type, snap, lineSubtotal, lineTax, lineCostTotal, lineProfit } of lines) {
+        const itemUid = crypto.randomUUID()
 
         if (type === 'PRODUCT' && item.productPublicId) {
-          const snap          = productSnaps.get(item.productPublicId)
-          const lineCostTotal = (snap?.cost ?? 0) * item.qty
-          const lineProfit    = item.lineTotal - lineCostTotal
+          const psnap = snap as ProductSnap | undefined
 
           const { lastInsertRowid: saleItemId } = insertItem.run(
             itemUid, salePublicId, 'PRODUCT',
-            item.productPublicId, null, snap?.id ?? null, null,
+            item.productPublicId, null, psnap?.id ?? null, null,
             item.qty, item.price, item.discount, item.lineTotal,
-            lineSubtotal, 0, lineCostTotal, lineProfit,
-            snap?.sku ?? null, snap?.name ?? null, snap?.categoryName ?? null,
-            snap?.sku ?? null, snap?.barcode ?? null,
-            snap?.cost ?? null, snap?.taxRateBp ?? null, snap?.profitPctBp ?? null,
-            snap ? 1 : 0, now, now
+            lineSubtotal, lineTax, lineCostTotal, lineProfit,
+            psnap?.sku ?? null, psnap?.name ?? null, psnap?.categoryName ?? null,
+            psnap?.sku ?? null, psnap?.barcode ?? null,
+            psnap?.cost ?? null, psnap?.taxRateBp ?? null, psnap?.profitPctBp ?? null,
+            psnap ? 1 : 0, now, now
           )
 
-          if (snap) {
+          if (psnap) {
             const { stock: before } = db.prepare(
               `SELECT stock FROM "Product" WHERE id = ?`
-            ).get(snap.id) as { stock: number }
+            ).get(psnap.id) as { stock: number }
 
-            updateStock.run(item.qty, now, snap.id)
+            updateStock.run(item.qty, now, psnap.id)
 
             const { stock: after } = db.prepare(
               `SELECT stock FROM "Product" WHERE id = ?`
-            ).get(snap.id) as { stock: number }
+            ).get(psnap.id) as { stock: number }
 
             insertMove.run(
-              snap.id, snap.id, item.qty,
+              crypto.randomUUID(),
+              movementTypeFromSource('SALE'),
+              psnap.id,
+              psnap.id,
+              'SALE',
+              saleId,
+              item.qty,
+              'Venta',
               before, after, payload.cashierId, saleId, saleItemId,
-              item.productPublicId, snap.sku, snap.name,
-              snap.cost, now
+              item.productPublicId, psnap.sku, psnap.name,
+              psnap.cost, null, now, now
             )
           }
         } else {
-          const snap          = item.servicePublicId ? serviceSnaps.get(item.servicePublicId) : undefined
-          const lineCostTotal = (snap?.cost ?? 0) * item.qty
-          const lineProfit    = item.lineTotal - lineCostTotal
+          const ssnap = snap as ServiceSnap | undefined
+          const serviceSupplyRows =
+            ssnap && item.servicePublicId ? (serviceSupplies.get(item.servicePublicId) ?? []) : []
 
-          insertItem.run(
+          const { lastInsertRowid: saleItemId } = insertItem.run(
             itemUid, salePublicId, 'SERVICE',
-            null, item.servicePublicId, null, snap?.id ?? null,
+            null, item.servicePublicId, null, ssnap?.id ?? null,
             item.qty, item.price, item.discount, item.lineTotal,
-            lineSubtotal, 0, lineCostTotal, lineProfit,
-            snap?.code ?? null, snap?.name ?? null, null,
+            lineSubtotal, lineTax, lineCostTotal, lineProfit,
+            ssnap?.code ?? null, ssnap?.name ?? null, null,
             null, null,
-            snap?.cost ?? null, snap?.taxRateBp ?? null, snap?.profitPctBp ?? null,
-            0, now, now
+            ssnap?.cost ?? null, ssnap?.taxRateBp ?? null, ssnap?.profitPctBp ?? null,
+            serviceSupplyRows.length > 0 ? 1 : 0, now, now
           )
+
+          for (const supply of serviceSupplyRows) {
+            const consumedQty = item.qty * supply.qty
+            const { stock: before } = db.prepare(
+              `SELECT stock FROM "Product" WHERE id = ?`
+            ).get(supply.productId) as { stock: number }
+
+            updateStock.run(consumedQty, now, supply.productId)
+
+            const { stock: after } = db.prepare(
+              `SELECT stock FROM "Product" WHERE id = ?`
+            ).get(supply.productId) as { stock: number }
+
+            insertServiceConsumptionMove.run(
+              crypto.randomUUID(),
+              movementTypeFromSource('SERVICE_CONSUMPTION'),
+              supply.productId,
+              supply.productId,
+              'SERVICE_CONSUMPTION',
+              saleId,
+              consumedQty,
+              `Consumo por servicio: ${ssnap?.name ?? 'Servicio'}`,
+              before,
+              after,
+              payload.cashierId,
+              saleId,
+              saleItemId,
+              ssnap?.id ?? null,
+              ssnap?.id ?? null,
+              supply.productPublicId,
+              supply.sku,
+              supply.name,
+              ssnap?.name ?? null,
+              supply.cost,
+              JSON.stringify({
+                servicePublicId: item.servicePublicId,
+                serviceCode: ssnap?.code ?? null,
+                serviceName: ssnap?.name ?? null,
+                unitsSold: item.qty,
+                supplyQtyPerService: supply.qty
+              }),
+              null,
+              now,
+              now
+            )
+          }
         }
       }
 
@@ -167,6 +309,14 @@ export function registerSalesIpc(): void {
              payload.payment.method, payload.payment.amount, now, now)
     })()
 
+    // Background push — does not block the response; retryable via sync:pushPending
+    const { id: localSaleId } = db.prepare(
+      `SELECT id FROM "Sale" WHERE "publicId" = ?`
+    ).get(salePublicId) as { id: number }
+    pushSaleToSupabase(localSaleId).catch(err =>
+      console.error('[sales:create] Supabase sync failed, will retry via pushPending:', err)
+    )
+
     return { ok: true as const, folio, salePublicId }
   })
 
@@ -174,13 +324,13 @@ export function registerSalesIpc(): void {
     const db = getLocalDb()
     type Row = {
       id: number; folio: string; createdAt: string
-      total: number; subtotal: number; tax: number; status: string
+      total: number; subtotal: number; status: string
       cashierName: string | null; itemCount: number; paymentMethod: string | null
     }
     const rows = db.prepare(`
       SELECT
         s.id, s.folio, s."createdAt" AS createdAt,
-        s.total, s.subtotal, s.tax, s.status,
+        s.total, s.subtotal, s.status,
         u.name          AS cashierName,
         COUNT(si.id)    AS itemCount,
         p.method        AS paymentMethod
@@ -199,7 +349,6 @@ export function registerSalesIpc(): void {
       createdAt:     r.createdAt,
       total:         r.total,
       subtotal:      r.subtotal,
-      tax:           r.tax,
       status:        r.status,
       cashierName:   r.cashierName ?? '—',
       itemCount:     r.itemCount,

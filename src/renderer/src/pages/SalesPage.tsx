@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import styles from './SalesPage.module.css'
+import { formatMXN } from '../lib/formatters'
 import {
   FiSearch,
   FiFileText,
@@ -97,8 +98,7 @@ async function loadCatalog(): Promise<CatalogItem[]> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const fmt = (n: number): string =>
-  n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
+const fmt = (n: number): string => formatMXN(n)
 
 const uid = (): string => Math.random().toString(36).slice(2)
 
@@ -369,7 +369,7 @@ const METHODS: { key: PaymentMethod; label: string }[] = [
 function PaymentSection({
   method, total, cashReceived, onMethodChange, onCashChange, onCharge, disabled
 }: PaymentSectionProps): ReactElement {
-  const received = parseFloat(cashReceived) || 0
+  const received = Math.round((parseFloat(cashReceived) || 0) * 100)
   const change = received - total
 
   return (
@@ -633,8 +633,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   // ── Totals ───────────────────────────────────────────────────
 
   const subtotal = useMemo(() => cart.reduce((acc, e) => acc + e.price * e.qty, 0), [cart])
-  const tax = useMemo(() => Math.round(subtotal * 0.16 * 100) / 100, [subtotal])
-  const total = useMemo(() => subtotal + tax - discount, [subtotal, tax, discount])
+  const total = useMemo(() => subtotal - discount, [subtotal, discount])
 
   // ── Keyboard shortcut: Escape clears search ──────────────────
   const handleSearchKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
@@ -656,12 +655,10 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
           discount: 0,
           lineTotal: e.price * e.qty,
         })),
-        subtotal,
-        tax,
-        total,
+        discount,
         payment: {
           method: payMethod,
-          amount: parseFloat(cashReceived) || total,
+          amount: Math.round((parseFloat(cashReceived) || 0) * 100) || total,
         },
       })
       clearCart()
@@ -672,7 +669,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     } finally {
       setCharging(false)
     }
-  }, [cart, charging, user.id, subtotal, tax, total, payMethod, cashReceived, clearCart])
+  }, [cart, charging, user.id, discount, total, payMethod, cashReceived, clearCart])
 
   // ── Render ───────────────────────────────────────────────────
 
@@ -781,17 +778,13 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
               <span>{fmt(subtotal)}</span>
             </div>
             <div className={styles.summaryRow}>
-              <span>IVA (16%)</span>
-              <span>{fmt(tax)}</span>
-            </div>
-            <div className={styles.summaryRow}>
               <span>
                 Descuento
                 <button
                   className={styles.discountToggle}
                   onClick={() => {
-                    const v = prompt('Descuento en pesos:', String(discount))
-                    if (v !== null) setDiscount(Math.max(0, parseFloat(v) || 0))
+                    const v = prompt('Descuento en pesos:', (discount / 100).toFixed(2))
+                    if (v !== null) setDiscount(Math.max(0, Math.round((parseFloat(v) || 0) * 100)))
                   }}
                 >
                   Editar
