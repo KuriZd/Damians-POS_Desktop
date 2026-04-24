@@ -232,7 +232,7 @@ export function registerInventoryIpc(): void {
       ORDER BY day ASC
     `).all() as DayRow[]
 
-    const DAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
+    const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
     const result: { label: string; sales: number; profit: number }[] = []
 
     for (let i = 6; i >= 0; i--) {

@@ -34,12 +34,18 @@ function margin(cost: number, price: number): number {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-type KpiCardProps = { label: string; value: string; change: number; icon: JSX.Element; accent: string }
+type KpiCardProps = { label: string; value: string; change: number; icon: JSX.Element; accent: string; onClick?: () => void }
 
-function KpiCard({ label, value, change, icon, accent }: KpiCardProps): JSX.Element {
+function KpiCard({ label, value, change, icon, accent, onClick }: KpiCardProps): JSX.Element {
   const up = change >= 0
   return (
-    <div className={styles.kpiCard} style={{ borderTop: `3px solid ${accent}` }}>
+    <div
+      className={`${styles.kpiCard} ${onClick ? styles.kpiClickable : ''}`}
+      style={{ borderTop: `3px solid ${accent}` }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className={styles.kpiTop}>
         <span className={styles.kpiLabel}>{label}</span>
         <span className={styles.kpiIconWrap} style={{ background: `${accent}18`, color: accent }}>{icon}</span>
@@ -48,6 +54,57 @@ function KpiCard({ label, value, change, icon, accent }: KpiCardProps): JSX.Elem
       <div className={`${styles.kpiChange} ${up ? styles.kpiUp : styles.kpiDown}`}>
         {up ? <FiArrowUp size={10} /> : <FiArrowDown size={10} />}
         <span>{Math.abs(change)}% vs período anterior</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Low Stock Modal ──────────────────────────────────────────────────────────
+
+function LowStockModal({ products, onClose }: { products: InventoryProduct[]; onClose: () => void }): JSX.Element {
+  const items = products.filter(p => p.status !== 'ok')
+
+  return (
+    <div className={styles.moveOverlay} onClick={onClose}>
+      <div className={styles.lsModal} onClick={e => e.stopPropagation()}>
+        <div className={styles.moveModalHead}>
+          <div className={styles.moveModalTitle}>
+            <FiAlertTriangle size={16} />
+            Productos con stock bajo o agotado ({items.length})
+          </div>
+          <button className={styles.drawerClose} onClick={onClose}><FiX size={16} /></button>
+        </div>
+        <div className={styles.lsBody}>
+          {items.length === 0 ? (
+            <div className={styles.lsEmpty}>Todos los productos tienen stock suficiente.</div>
+          ) : (
+            <table className={styles.lsTable}>
+              <thead>
+                <tr>
+                  <th>Producto</th><th>SKU</th>
+                  <th className={styles.lsCenter}>Stock</th>
+                  <th className={styles.lsCenter}>Mínimo</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(p => (
+                  <tr key={p.id}>
+                    <td>{p.name}</td>
+                    <td className={styles.lsSku}>{p.sku}</td>
+                    <td className={`${styles.lsCenter} ${p.status === 'out' ? styles.lsStockOut : styles.lsStockLow}`}>{p.stock}</td>
+                    <td className={`${styles.lsCenter} ${styles.muted}`}>{p.stockMin}</td>
+                    <td>
+                      <span className={`${styles.lsBadge} ${p.status === 'out' ? styles.lsBadgeOut : styles.lsBadgeLow}`}>
+                        {p.status === 'out' ? 'Agotado' : 'Stock bajo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -114,7 +171,7 @@ function BarChart({ data, mode }: { data: InventoryChartPoint[]; mode: ChartMode
                 width={mode === 'both' ? half : bW} height={Math.max(2, bH(d.profit))}
                 rx="3" fill={isLast ? '#6ee7b7' : '#10b981'} opacity="0.88" />
             )}
-            <text x={x + bW / 2} y={H - 6} textAnchor="middle" fontSize="9"
+            <text x={x + bW / 2} y={H - 6} textAnchor="middle" fontSize="10"
               fill={isLast ? '#4f6ef7' : '#9ca3af'} fontWeight={isLast ? 700 : 400}>
               {d.label}
             </text>
@@ -370,6 +427,7 @@ export default function InventoryPage({ user }: InventoryPageProps): JSX.Element
   const [moveFilter, setMoveFilter] = useState<MoveType | 'all'>('all')
   const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null)
   const [showMoveModal, setShowMoveModal] = useState(false)
+  const [lowStockOpen, setLowStockOpen] = useState(false)
 
   // ── Data state ──
   const [products, setProducts]   = useState<InventoryProduct[]>([])
@@ -477,6 +535,7 @@ export default function InventoryPage({ user }: InventoryPageProps): JSX.Element
 
   return (
     <section className={styles.page}>
+      {lowStockOpen && <LowStockModal products={products} onClose={() => setLowStockOpen(false)} />}
       <div className={styles.panel}>
 
         {/* ── Header ─────────────────────────────────────────── */}
@@ -526,7 +585,12 @@ export default function InventoryPage({ user }: InventoryPageProps): JSX.Element
                     <div className={styles.kpiValue} style={{ color: '#e2e8f0' }}>—</div>
                   </div>
                 ))
-              : kpiRows.map((k, i) => <KpiCard key={i} {...k} />)
+              : kpiRows.map((k, i) => (
+                  <KpiCard
+                    key={i} {...k}
+                    onClick={i === 6 && stats && stats.bajos > 0 ? () => setLowStockOpen(true) : undefined}
+                  />
+                ))
             }
           </div>
 
@@ -740,7 +804,7 @@ export default function InventoryPage({ user }: InventoryPageProps): JSX.Element
                 </button>
               </div>
             </div>
-            <div className={styles.tableWrap}>
+            <div className={styles.tableWrapScroll}>
               <div className={`${styles.productRow} ${styles.tableHead}`}>
                 <div>Producto</div><div>SKU</div><div>Categoría</div>
                 <div className={styles.tCenter}>Stock</div>

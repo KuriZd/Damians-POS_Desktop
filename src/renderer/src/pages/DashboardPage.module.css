@@ -385,6 +385,121 @@
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 
+/* ─── KPI clickable ──────────────────────────────────────────────────────────*/
+
+.kpiClickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+
+.kpiClickable:hover {
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.18);
+  transform: translateY(-1px);
+}
+
+/* ─── Low Stock Modal ────────────────────────────────────────────────────────*/
+
+.lsOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.lsModal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.2);
+  width: 100%;
+  max-width: 680px;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1.5px solid #f0f2f8;
+  flex-shrink: 0;
+}
+
+.lsTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a2340;
+}
+
+.lsClose {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e6f0;
+  background: #f4f6fb;
+  color: #6a7190;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+
+.lsClose:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+.lsBody { overflow-y: auto; flex: 1; }
+
+.lsLoading,
+.lsEmpty {
+  padding: 40px;
+  text-align: center;
+  color: #9aa3bb;
+  font-size: 13.5px;
+}
+
+.lsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lsTable thead tr { background: #f8f9fd; border-bottom: 1.5px solid #e8ecf5; }
+
+.lsTable th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a84a1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.lsTable tbody tr { border-bottom: 1px solid #f0f2f8; transition: background 0.1s; }
+.lsTable tbody tr:last-child { border-bottom: none; }
+.lsTable tbody tr:hover { background: #f8f9fd; }
+.lsTable td { padding: 10px 16px; color: #374263; }
+
+.lsCenter { text-align: center; }
+.lsSku { font-family: monospace; font-size: 12px; color: #8890a4; }
+.lsStockOut { color: #dc2626; font-weight: 700; }
+.lsStockLow { color: #d97706; font-weight: 700; }
+
+.lsBadge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+.lsBadgeOut { background: #fee2e2; color: #dc2626; }
+.lsBadgeLow { background: #fef3c7; color: #d97706; }
+
 @media (max-width: 1100px) {
 
   .kpiRow,

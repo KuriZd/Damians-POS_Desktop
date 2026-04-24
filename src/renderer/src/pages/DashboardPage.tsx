@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactElement } from 'react'
 import {
   FiShoppingCart, FiTrendingUp, FiPackage, FiAlertTriangle,
-  FiRefreshCw, FiCalendar,
+  FiRefreshCw, FiCalendar, FiX,
 } from 'react-icons/fi'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 import styles from './DashboardPage.module.css'
@@ -151,11 +151,17 @@ type KpiCardProps = {
   sub?: string
   accent?: string
   alert?: boolean
+  onClick?: () => void
 }
 
-function KpiCard({ icon, label, value, sub, accent = '#5b79ff', alert }: KpiCardProps): ReactElement {
+function KpiCard({ icon, label, value, sub, accent = '#5b79ff', alert, onClick }: KpiCardProps): ReactElement {
   return (
-    <div className={`${styles.kpiCard} ${alert ? styles.kpiAlert : ''}`}>
+    <div
+      className={`${styles.kpiCard} ${alert ? styles.kpiAlert : ''} ${onClick ? styles.kpiClickable : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className={styles.kpiIcon} style={{ background: `${accent}18`, color: accent }}>
         {icon}
       </div>
@@ -163,6 +169,69 @@ function KpiCard({ icon, label, value, sub, accent = '#5b79ff', alert }: KpiCard
         <span className={styles.kpiLabel}>{label}</span>
         <span className={styles.kpiValue}>{value}</span>
         {sub && <span className={styles.kpiSub}>{sub}</span>}
+      </div>
+    </div>
+  )
+}
+
+// ─── Low Stock Modal ──────────────────────────────────────────────────────────
+
+type StockItem = { id: number; name: string; sku: string; stock: number; stockMin: number; status: 'low' | 'out' }
+
+function LowStockModal({ onClose }: { onClose: () => void }): ReactElement {
+  const [items, setItems] = useState<StockItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void window.pos.inventory.products().then(prods => {
+      setItems(prods.filter(p => p.status !== 'ok') as StockItem[])
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className={styles.lsOverlay} onClick={onClose}>
+      <div className={styles.lsModal} onClick={e => e.stopPropagation()}>
+        <div className={styles.lsHead}>
+          <div className={styles.lsTitle}>
+            <FiAlertTriangle size={16} />
+            Productos con stock bajo o agotado
+          </div>
+          <button className={styles.lsClose} onClick={onClose}><FiX size={16} /></button>
+        </div>
+        <div className={styles.lsBody}>
+          {loading ? (
+            <div className={styles.lsLoading}>Cargando…</div>
+          ) : items.length === 0 ? (
+            <div className={styles.lsEmpty}>Todos los productos tienen stock suficiente.</div>
+          ) : (
+            <table className={styles.lsTable}>
+              <thead>
+                <tr>
+                  <th>Producto</th><th>SKU</th>
+                  <th className={styles.lsCenter}>Stock</th>
+                  <th className={styles.lsCenter}>Mínimo</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(p => (
+                  <tr key={p.id}>
+                    <td>{p.name}</td>
+                    <td className={styles.lsSku}>{p.sku}</td>
+                    <td className={`${styles.lsCenter} ${p.status === 'out' ? styles.lsStockOut : styles.lsStockLow}`}>{p.stock}</td>
+                    <td className={`${styles.lsCenter} ${styles.lsMuted}`}>{p.stockMin}</td>
+                    <td>
+                      <span className={`${styles.lsBadge} ${p.status === 'out' ? styles.lsBadgeOut : styles.lsBadgeLow}`}>
+                        {p.status === 'out' ? 'Agotado' : 'Stock bajo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -179,6 +248,7 @@ export default function DashboardPage({ user }: { user: AuthUser }): ReactElemen
   const [syncMsg, setSyncMsg]     = useState('')
   const [lastCode, setLastCode]   = useState('')
   const [product, setProduct]     = useState<ProductLookup>(null)
+  const [lowStockOpen, setLowStockOpen] = useState(false)
 
   useEffect(() => {
     void window.pos.dashboard.stats().then(s => {
@@ -208,6 +278,7 @@ export default function DashboardPage({ user }: { user: AuthUser }): ReactElemen
 
   return (
     <div className={styles.page}>
+      {lowStockOpen && <LowStockModal onClose={() => setLowStockOpen(false)} />}
 
       {/* ── Greeting ── */}
       <div className={styles.greetingRow}>
@@ -262,9 +333,10 @@ export default function DashboardPage({ user }: { user: AuthUser }): ReactElemen
             icon={<FiAlertTriangle size={20} />}
             label="Stock bajo / agotado"
             value={String(stats.lowStock)}
-            sub={stats.lowStock > 0 ? 'productos requieren atención' : 'todo en orden'}
+            sub={stats.lowStock > 0 ? 'clic para ver detalle' : 'todo en orden'}
             accent={stats.lowStock > 0 ? '#ef4444' : '#22c55e'}
             alert={stats.lowStock > 0}
+            onClick={stats.lowStock > 0 ? () => setLowStockOpen(true) : undefined}
           />
         </div>
       ) : null}

@@ -71,7 +71,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): ReactElem
         <div className={styles.wrapper}>
             <div className={styles.card}>
                 {/* Título principal de la papelería */}
-                <h1 className={styles.title}>Damian’s Papeleria</h1>
+                <h1 className={styles.title}>Papelería Damian</h1>
 
                 {/* Logo corporativo */}
                 <div className={styles.logoContainer}>

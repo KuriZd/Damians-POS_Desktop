@@ -166,6 +166,75 @@
   background: #3a56d4;
 }
 
+/* ─── KPI clickable ─────────────────────────────────────────────────────────*/
+
+.kpiClickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+
+.kpiClickable:hover {
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.18);
+  transform: translateY(-1px);
+}
+
+/* ─── Low Stock Modal ────────────────────────────────────────────────────────*/
+
+.lsModal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.2);
+  width: 100%;
+  max-width: 680px;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: moveModalIn 0.2s ease;
+}
+
+.lsBody { overflow-y: auto; flex: 1; }
+
+.lsEmpty {
+  padding: 40px;
+  text-align: center;
+  color: #9aa3bb;
+  font-size: 13.5px;
+}
+
+.lsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lsTable thead tr { background: #f8f9fd; border-bottom: 1.5px solid #e8ecf5; }
+
+.lsTable th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a84a1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.lsTable tbody tr { border-bottom: 1px solid #f0f2f8; transition: background 0.1s; }
+.lsTable tbody tr:last-child { border-bottom: none; }
+.lsTable tbody tr:hover { background: #f8f9fd; }
+.lsTable td { padding: 10px 16px; color: #374263; }
+
+.lsCenter { text-align: center; }
+.lsSku { font-family: monospace; font-size: 12px; color: #8890a4; }
+.lsStockOut { color: #dc2626; font-weight: 700; }
+.lsStockLow { color: #d97706; font-weight: 700; }
+
+.lsBadge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+.lsBadgeOut { background: #fee2e2; color: #dc2626; }
+.lsBadgeLow { background: #fef3c7; color: #d97706; }
+
 /* ─── Card ────────────────────────────────────────────────────────────────── */
 
 .card {
@@ -401,6 +470,26 @@
   overflow: hidden;
 }
 
+.tableWrapScroll {
+  border: 1px solid #edf0f8;
+  border-radius: 10px;
+  overflow-y: auto;
+  max-height: 440px;
+}
+
+.tableWrapScroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.tableWrapScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tableWrapScroll::-webkit-scrollbar-thumb {
+  background: #d7dbe6;
+  border-radius: 4px;
+}
+
 .tableRow {
   display: grid;
   grid-template-columns: 90px 1fr 90px 52px 52px 52px 90px 1fr;
@@ -426,6 +515,9 @@
   font-weight: 700;
   color: #374151;
   letter-spacing: 0.02em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .productRow {
@@ -1378,6 +1470,12 @@
   color: #1a2340;
   font-family: inherit;
   outline: none;
+  -moz-appearance: textfield;
+}
+
+.moveQtyInput::-webkit-inner-spin-button,
+.moveQtyInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
 }
 
 .moveQtyInputFull {
