@@ -1,7 +1,12 @@
 node_modules
 dist
 out
+release
 .DS_Store
 .eslintcache
 *.log*
 .env
+*.pfx
+
+# Runtime secrets - never commit
+build/pos-runtime.env

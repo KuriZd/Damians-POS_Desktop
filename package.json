@@ -1,10 +1,10 @@
 {
-  "name": "pos-damian",
-  "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "name": "pos-multimodal",
+  "version": "0.1.0",
+  "description": "Punto de venta de escritorio con Electron, React, SQLite y Supabase",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Oscar Zamudio",
+  "homepage": "https://github.com/oscarzamudio/pos-multimodal",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -16,15 +16,13 @@
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
-    "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
-  },
-  "build": {
-    "asarUnpack": [
-      "**/node_modules/better-sqlite3/**/*.node"
-    ]
+    "build:unpack": "npm run build && electron-builder --config electron-builder.yml --dir",
+    "build:win": "npm run build && electron-builder --config electron-builder.yml --win",
+    "build:release": "npm run build && electron-builder --config electron-builder.yml --win nsis --publish never",
+    "build:official": "npm run build:release",
+    "build:signed": "powershell -ExecutionPolicy Bypass -File .\\scripts\\build-signed.ps1",
+    "build:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
+    "build:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
