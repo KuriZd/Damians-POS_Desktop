@@ -24,18 +24,6 @@ const SOURCE_TO_UI: Record<string, UiMoveType> = {
   MANUAL:              'merma',
 }
 
-function movementTypeFromSource(sourceType: string): 'IN' | 'OUT' {
-  switch (sourceType) {
-    case 'PURCHASE':
-    case 'OPENING_STOCK':
-    case 'RETURN':
-    case 'SALE_CANCEL':
-      return 'IN'
-    default:
-      return 'OUT'
-  }
-}
-
 function periodDates(period: Period): { current: string; previous: string; prevTo: string } {
   const now = new Date()
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
