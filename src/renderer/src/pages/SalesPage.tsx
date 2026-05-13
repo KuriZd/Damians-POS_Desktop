@@ -601,38 +601,148 @@ function HistorialModal({ onClose }: HistorialModalProps): ReactElement {
 
 // ─── Corte de Caja Modal ─────────────────────────────────────────────────────
 
+type CashMovementItem = {
+  id: number
+  type: string
+  amount: number
+  reason: string | null
+  createdAt: string
+}
+
 type CorteData = {
+  sessionId: number
+  openedAt: string
+  initialCash: number
+  expected: number
+  totalEfectivo: number
+  totalEntradas: number
+  totalSalidas: number
+  movements: CashMovementItem[]
+  byMethod: Record<string, number>
   totalVentas: number
   tickets: number
-  byMethod: Record<string, number>
   generatedAt: string
 }
 
 type CorteModalProps = {
   cashierId: number
   cashierName: string
+  cashierRole: string
   onClose: () => void
 }
 
-function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): ReactElement {
+function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModalProps): ReactElement {
+  const needsAuth = cashierRole === 'CASHIER'
+
+  const [authorized, setAuthorized] = useState(!needsAuth)
+  const [authUsername, setAuthUsername] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+
   const [data, setData] = useState<CorteData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [counted, setCounted] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+
+  const [withdrawalView, setWithdrawalView] = useState(false)
+  const [withdrawalAmount, setWithdrawalAmount] = useState('')
+  const [withdrawalReason, setWithdrawalReason] = useState('')
+  const [withdrawalLoading, setWithdrawalLoading] = useState(false)
+  const [withdrawalError, setWithdrawalError] = useState<string | null>(null)
+
+  function loadData(): void {
+    setLoading(true)
+    void window.pos.sales.corte(cashierId)
+      .then((d: CorteData) => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }
 
   useEffect(() => {
-    void window.pos.sales.corte(cashierId)
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [cashierId])
+    if (!authorized) return
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authorized, cashierId])
 
-  const expectedCash = data?.byMethod['efectivo'] ?? 0
+  async function handleAuth(): Promise<void> {
+    if (!authUsername.trim() || !authPassword) return
+    setAuthLoading(true)
+    setAuthError(null)
+    try {
+      const result = await window.pos.auth.verifySupervisor(authUsername, authPassword) as
+        | { ok: true; name: string; role: string }
+        | { ok: false; error: string }
+      if (result.ok) {
+        setAuthorized(true)
+      } else {
+        setAuthError(result.error)
+      }
+    } catch {
+      setAuthError('No se pudo verificar. Intenta de nuevo.')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
   const countedCents = Math.round((parseFloat(counted) || 0) * 100)
-  const diff = countedCents - expectedCash
+  const diff = data ? countedCents - data.expected : 0
   const hasCounted = counted.trim() !== ''
 
-  const now = new Date()
-  const dateLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const timeLabel = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  const openedAtLabel = data
+    ? new Date(data.openedAt).toLocaleString('es-MX', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : '—'
+
+  async function handleConfirm(): Promise<void> {
+    if (!data || confirming) return
+    setConfirming(true)
+    setConfirmError(null)
+    try {
+      const countedArg = hasCounted ? countedCents : undefined
+      const result = await window.pos.sales.confirmCorte(cashierId, countedArg) as
+        | { ok: true; sessionId: number }
+        | { ok: false; error: string }
+      if (result.ok) {
+        setConfirmed(true)
+      } else {
+        setConfirmError(result.error)
+      }
+    } catch {
+      setConfirmError('No se pudo realizar el corte. Intenta de nuevo.')
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  async function handleWithdrawal(): Promise<void> {
+    const cents = Math.round((parseFloat(withdrawalAmount) || 0) * 100)
+    if (cents <= 0 || withdrawalLoading) return
+    setWithdrawalLoading(true)
+    setWithdrawalError(null)
+    try {
+      const result = await window.pos.sales.cashMovement({
+        type: 'OUT',
+        amount: cents,
+        reason: withdrawalReason.trim() || undefined,
+      }) as { ok: true; id: number } | { ok: false; error: string }
+      if (result.ok) {
+        setWithdrawalView(false)
+        setWithdrawalAmount('')
+        setWithdrawalReason('')
+        loadData()
+      } else {
+        setWithdrawalError(result.error)
+      }
+    } catch {
+      setWithdrawalError('No se pudo registrar el retiro. Intenta de nuevo.')
+    } finally {
+      setWithdrawalLoading(false)
+    }
+  }
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
@@ -648,26 +758,112 @@ function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): React
         </div>
 
         <div className={styles.corteBody}>
-          {loading ? (
+          {withdrawalView ? (
+            <div className={styles.corteAuth}>
+              <p className={styles.corteAuthTitle}>Retiro de efectivo</p>
+              <p className={styles.corteAuthSub}>El monto se descontará del efectivo esperado en caja.</p>
+              <div className={styles.corteAuthForm}>
+                <div className={styles.corteAuthField}>
+                  <label className={styles.corteAuthLabel}>Monto a retirar</label>
+                  <div className={styles.cashInputWrap}>
+                    <span className={styles.cashPrefix}>$</span>
+                    <input
+                      className={styles.cashInput}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={withdrawalAmount}
+                      onChange={e => setWithdrawalAmount(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { void handleWithdrawal() } }}
+                      autoFocus
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+                <div className={styles.corteAuthField}>
+                  <label className={styles.corteAuthLabel}>Motivo <span className={styles.corteSectionOptional}>(opcional)</span></label>
+                  <input
+                    className={styles.corteAuthInput}
+                    type="text"
+                    placeholder="Ej. Pago a proveedor, gastos operativos…"
+                    value={withdrawalReason}
+                    onChange={e => setWithdrawalReason(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { void handleWithdrawal() } }}
+                  />
+                </div>
+                {withdrawalError && <p className={styles.corteError}>{withdrawalError}</p>}
+              </div>
+            </div>
+          ) : !authorized ? (
+            <div className={styles.corteAuth}>
+              <p className={styles.corteAuthTitle}>Autorización requerida</p>
+              <p className={styles.corteAuthSub}>Ingresa las credenciales de un supervisor o administrador para continuar.</p>
+              <div className={styles.corteAuthForm}>
+                <div className={styles.corteAuthField}>
+                  <label className={styles.corteAuthLabel}>Usuario</label>
+                  <input
+                    className={styles.corteAuthInput}
+                    type="text"
+                    placeholder="Usuario"
+                    value={authUsername}
+                    onChange={e => setAuthUsername(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { void handleAuth() } }}
+                    autoFocus
+                  />
+                </div>
+                <div className={styles.corteAuthField}>
+                  <label className={styles.corteAuthLabel}>Contraseña</label>
+                  <input
+                    className={styles.corteAuthInput}
+                    type="password"
+                    placeholder="Contraseña"
+                    value={authPassword}
+                    onChange={e => setAuthPassword(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { void handleAuth() } }}
+                  />
+                </div>
+                {authError && <p className={styles.corteError}>{authError}</p>}
+                <button
+                  className={styles.corteConfirmBtn}
+                  onClick={() => { void handleAuth() }}
+                  disabled={authLoading || !authUsername.trim() || !authPassword}
+                >
+                  {authLoading
+                    ? <><FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Verificando…</>
+                    : 'Autorizar'
+                  }
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
             <div className={styles.modalLoading}>
               <FiRefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} />
               <span>Calculando…</span>
             </div>
           ) : !data ? (
             <div className={styles.modalEmpty}>No se pudo cargar el corte.</div>
+          ) : confirmed ? (
+            <div className={styles.corteSuccess}>
+              <div className={styles.corteSuccessIcon}>✓</div>
+              <p className={styles.corteSuccessTitle}>Corte realizado</p>
+              <p className={styles.corteSuccessSub}>
+                Sesión cerrada · {data.tickets} {data.tickets === 1 ? 'venta' : 'ventas'} por {fmt(data.totalVentas)}
+              </p>
+            </div>
           ) : (
             <>
-              {/* Info del turno */}
+              {/* Meta de sesión */}
               <div className={styles.corteMeta}>
                 <span className={styles.corteMetaItem}><strong>Cajero:</strong> {cashierName}</span>
-                <span className={styles.corteMetaItem}><strong>Fecha:</strong> {dateLabel}</span>
-                <span className={styles.corteMetaItem}><strong>Hora:</strong> {timeLabel}</span>
+                <span className={styles.corteMetaItem}><strong>Apertura:</strong> {openedAtLabel}</span>
+                <span className={styles.corteMetaItem}><strong>Saldo inicial:</strong> {fmt(data.initialCash)}</span>
               </div>
 
-              {/* KPIs */}
+              {/* KPIs de ventas */}
               <div className={styles.corteKpis}>
                 <div className={styles.corteKpi}>
-                  <span className={styles.corteKpiLabel}>Ventas del día</span>
+                  <span className={styles.corteKpiLabel}>Total ventas</span>
                   <span className={styles.corteKpiValue}>{fmt(data.totalVentas)}</span>
                 </div>
                 <div className={styles.corteKpi}>
@@ -675,7 +871,7 @@ function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): React
                   <span className={styles.corteKpiValue}>{data.tickets}</span>
                 </div>
                 <div className={styles.corteKpi}>
-                  <span className={styles.corteKpiLabel}>Ticket promedio</span>
+                  <span className={styles.corteKpiLabel}>Ticket prom.</span>
                   <span className={styles.corteKpiValue}>
                     {data.tickets > 0 ? fmt(Math.round(data.totalVentas / data.tickets)) : '—'}
                   </span>
@@ -684,7 +880,7 @@ function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): React
 
               {/* Desglose por método */}
               <div className={styles.corteSection}>
-                <h4 className={styles.corteSectionTitle}>Desglose por método de pago</h4>
+                <h4 className={styles.corteSectionTitle}>Por método de pago</h4>
                 <div className={styles.corteMethodList}>
                   {Object.entries(METHOD_LABEL).map(([key, label]) => (
                     <div key={key} className={styles.corteMethodRow}>
@@ -695,20 +891,62 @@ function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): React
                 </div>
               </div>
 
+              {/* Movimientos de caja */}
+              <div className={styles.corteSection}>
+                <h4 className={styles.corteSectionTitle}>Movimientos de caja</h4>
+                {data.movements.length === 0 ? (
+                  <p className={styles.corteNoMovements}>Sin movimientos en esta sesión.</p>
+                ) : (
+                  <div className={styles.corteMovList}>
+                    {data.movements.map(m => (
+                      <div key={m.id} className={`${styles.corteMovRow} ${m.type === 'IN' ? styles.corteMovIn : styles.corteMovOut}`}>
+                        <span className={styles.corteMovType}>{m.type === 'IN' ? 'Entrada' : 'Retiro'}</span>
+                        <span className={styles.corteMovReason}>{m.reason ?? '—'}</span>
+                        <span className={styles.corteMovAmt}>{m.type === 'IN' ? '+' : '−'}{fmt(m.amount)}</span>
+                      </div>
+                    ))}
+                    <div className={styles.corteMovTotals}>
+                      <span>Entradas: <strong>{fmt(data.totalEntradas)}</strong></span>
+                      <span>Salidas: <strong>{fmt(data.totalSalidas)}</strong></span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Arqueo de efectivo */}
               <div className={styles.corteSection}>
                 <h4 className={styles.corteSectionTitle}>Arqueo de efectivo</h4>
                 <div className={styles.corteArqueo}>
                   <div className={styles.corteArqueoRow}>
-                    <span>Efectivo esperado en caja</span>
-                    <span className={styles.corteArqueoAmt}>{fmt(expectedCash)}</span>
+                    <span>Saldo inicial</span>
+                    <span className={styles.corteArqueoAmt}>{fmt(data.initialCash)}</span>
                   </div>
                   <div className={styles.corteArqueoRow}>
-                    <label htmlFor="counted">Efectivo contado</label>
+                    <span>Ventas en efectivo</span>
+                    <span className={styles.corteArqueoAmt}>{fmt(data.totalEfectivo)}</span>
+                  </div>
+                  {data.totalEntradas > 0 && (
+                    <div className={styles.corteArqueoRow}>
+                      <span>Entradas manuales</span>
+                      <span className={styles.corteArqueoAmt}>+{fmt(data.totalEntradas)}</span>
+                    </div>
+                  )}
+                  {data.totalSalidas > 0 && (
+                    <div className={styles.corteArqueoRow}>
+                      <span>Retiros</span>
+                      <span className={styles.corteArqueoAmt}>−{fmt(data.totalSalidas)}</span>
+                    </div>
+                  )}
+                  <div className={`${styles.corteArqueoRow} ${styles.corteArqueoExpected}`}>
+                    <span>Efectivo esperado</span>
+                    <span className={styles.corteArqueoAmt}>{fmt(data.expected)}</span>
+                  </div>
+                  <div className={styles.corteArqueoRow}>
+                    <label htmlFor="counted-input">Efectivo contado <span className={styles.corteSectionOptional}>(opcional)</span></label>
                     <div className={styles.cashInputWrap} style={{ width: 140 }}>
                       <span className={styles.cashPrefix}>$</span>
                       <input
-                        id="counted"
+                        id="counted-input"
                         type="number"
                         min="0"
                         step="0.01"
@@ -716,11 +954,9 @@ function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): React
                         placeholder="0.00"
                         value={counted}
                         onChange={e => setCounted(e.target.value)}
-                        autoFocus
                       />
                     </div>
                   </div>
-
                   {hasCounted && (
                     <div className={`${styles.changeRow} ${diff >= 0 ? styles.changePos : styles.changeNeg}`}>
                       <span>{diff >= 0 ? 'Sobrante' : 'Faltante'}</span>
@@ -729,17 +965,62 @@ function CorteModal({ cashierId, cashierName, onClose }: CorteModalProps): React
                   )}
                 </div>
               </div>
+
+              {confirmError && (
+                <p className={styles.corteError}>{confirmError}</p>
+              )}
             </>
           )}
         </div>
 
-        {!loading && data && (
-          <div className={styles.corteFooter}>
-            <button className={styles.corteCloseBtn} onClick={onClose}>
-              Cerrar
-            </button>
+        <div className={styles.corteFooter}>
+          <button
+            className={styles.corteRetiroBtn}
+            onClick={() => { setWithdrawalView(true); setWithdrawalError(null) }}
+            disabled={!authorized || confirmed || withdrawalView || loading}
+          >
+            Retiro de efectivo
+          </button>
+          <div className={styles.corteFooterActions}>
+            {withdrawalView ? (
+              <>
+                <button className={styles.corteCancelBtn} onClick={() => { setWithdrawalView(false); setWithdrawalError(null) }} disabled={withdrawalLoading}>
+                  Cancelar
+                </button>
+                <button
+                  className={styles.corteConfirmBtn}
+                  onClick={() => { void handleWithdrawal() }}
+                  disabled={withdrawalLoading || !withdrawalAmount || parseFloat(withdrawalAmount) <= 0}
+                >
+                  {withdrawalLoading
+                    ? <><FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Guardando…</>
+                    : 'Guardar retiro'
+                  }
+                </button>
+              </>
+            ) : confirmed ? (
+              <button className={styles.corteCloseBtn} onClick={onClose}>Cerrar</button>
+            ) : !authorized ? (
+              <button className={styles.corteCancelBtn} onClick={onClose}>Cancelar</button>
+            ) : !loading && data && (
+              <>
+                <button className={styles.corteCancelBtn} onClick={onClose} disabled={confirming}>
+                  Cancelar
+                </button>
+                <button
+                  className={styles.corteConfirmBtn}
+                  onClick={() => { void handleConfirm() }}
+                  disabled={confirming}
+                >
+                  {confirming
+                    ? <><FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Procesando…</>
+                    : <><FiScissors size={14} /> Confirmar corte</>
+                  }
+                </button>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
@@ -954,6 +1235,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
         <CorteModal
           cashierId={user.id}
           cashierName={user.name}
+          cashierRole={user.role}
           onClose={() => setCorteOpen(false)}
         />
       )}

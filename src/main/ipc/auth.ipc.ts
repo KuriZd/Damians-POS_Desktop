@@ -359,6 +359,67 @@ export function registerAuthIpc(): void {
     return currentUser
   })
 
+  ipcMain.handle('auth:verifySupervisor', async (_event, username: string, password: string) => {
+    const db = getLocalDb()
+    const trimmed = username.trim()
+
+    const localUser = db.prepare(`
+      SELECT id, name, username, role, active, "passwordHashLocal"
+      FROM "User"
+      WHERE lower(username) = lower(?) AND active = 1 AND "deletedAt" IS NULL
+      LIMIT 1
+    `).get(trimmed) as LocalUserRow | undefined
+
+    // Caso 1: hash local disponible → verificación offline sin red
+    if (localUser?.passwordHashLocal) {
+      const valid = await bcrypt.compare(password, localUser.passwordHashLocal)
+      if (!valid) return { ok: false as const, error: 'Contraseña incorrecta.' }
+      if (localUser.role === 'CASHIER') return { ok: false as const, error: 'El usuario no tiene permisos de supervisor o administrador.' }
+      return { ok: true as const, name: localUser.name, role: localUser.role }
+    }
+
+    // Caso 2: usuario local sin hash → nunca inició sesión en este dispositivo
+    if (localUser) {
+      return {
+        ok: false as const,
+        error: `"${localUser.username}" necesita iniciar sesión en este dispositivo al menos una vez antes de poder autorizar.`,
+      }
+    }
+
+    // Caso 3: usuario no está localmente → intentar Supabase y cachear hash si tiene éxito
+    try {
+      const candidates = Array.from(new Set([trimmed, trimmed.toLowerCase()]))
+      const { user: remoteUser } = await loginAgainstSupabase(candidates, password)
+      if (!remoteUser) return { ok: false as const, error: 'Credenciales incorrectas.' }
+      if (remoteUser.role === 'CASHIER') return { ok: false as const, error: 'El usuario no tiene permisos de supervisor o administrador.' }
+
+      // Guardar hash local para futuras verificaciones sin red
+      const passwordHashLocal = await bcrypt.hash(password, 10)
+      db.prepare(`
+        INSERT INTO "User" (id, username, name, role, active, "passwordHashLocal", "createdAt", "updatedAt", "lastRemoteLoginAt")
+        VALUES (@id, @username, @name, @role, @active, @passwordHashLocal, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          "passwordHashLocal" = excluded."passwordHashLocal",
+          "updatedAt" = CURRENT_TIMESTAMP,
+          "lastRemoteLoginAt" = CURRENT_TIMESTAMP
+      `).run({
+        id: remoteUser.id,
+        username: remoteUser.username,
+        name: remoteUser.name,
+        role: remoteUser.role,
+        active: remoteUser.active ? 1 : 0,
+        passwordHashLocal,
+      })
+
+      return { ok: true as const, name: remoteUser.name, role: remoteUser.role }
+    } catch {
+      return {
+        ok: false as const,
+        error: 'Usuario no encontrado localmente y sin conexión a internet. El supervisor debe iniciar sesión en este dispositivo al menos una vez.',
+      }
+    }
+  })
+
   ipcMain.handle('auth:me', async () => {
     if (!currentUser) {
       currentUser = readSession()

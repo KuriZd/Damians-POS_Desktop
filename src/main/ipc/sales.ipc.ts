@@ -341,38 +341,138 @@ export function registerSalesIpc(): void {
 
   ipcMain.handle('sales:corte', (_event, cashierId: number) => {
     const db = getLocalDb()
+    const now = new Date().toISOString()
 
-    type TotalsRow = { totalVentas: number | null; tickets: number }
-    const totals = db.prepare(`
+    // Find active session; auto-create one if none exists
+    let session = db.prepare(`
+      SELECT id, "cashierId", "openedAt", "initialCash"
+      FROM "CashSession"
+      WHERE "closedAt" IS NULL
+      ORDER BY id DESC
+      LIMIT 1
+    `).get() as { id: number; cashierId: number | null; openedAt: string; initialCash: number } | undefined
+
+    if (!session) {
+      const ins = db.prepare(`
+        INSERT INTO "CashSession" ("cashierId", "openedAt", "initialCash", "createdAt", "updatedAt")
+        VALUES (?, ?, 0, ?, ?)
+      `).run(cashierId, now, now, now)
+      session = { id: Number(ins.lastInsertRowid), cashierId, openedAt: now, initialCash: 0 }
+    }
+
+    type MovRow = { id: number; type: string; amount: number; reason: string | null; createdAt: string }
+    const movements = db.prepare(`
+      SELECT id, type, amount, reason, "createdAt"
+      FROM "CashMovement"
+      WHERE "sessionId" = ?
+      ORDER BY "createdAt" ASC
+    `).all(session.id) as MovRow[]
+
+    const totalEntradas = movements.filter(m => m.type === 'IN').reduce((s, m) => s + m.amount, 0)
+    const totalSalidas  = movements.filter(m => m.type === 'OUT').reduce((s, m) => s + m.amount, 0)
+
+    type SaleTotRow = { totalVentas: number | null; tickets: number }
+    const saleTots = db.prepare(`
       SELECT SUM(total) AS totalVentas, COUNT(*) AS tickets
       FROM "Sale"
-      WHERE status = 'COMPLETED'
-        AND DATE("createdAt") = DATE('now', 'localtime')
-        AND "cashierId" = ?
-    `).get(cashierId) as TotalsRow
+      WHERE status = 'COMPLETED' AND "createdAt" >= ?
+    `).get(session.openedAt) as SaleTotRow
 
     type MethodRow = { method: string | null; metodTotal: number | null }
-    const rows = db.prepare(`
+    const methodRows = db.prepare(`
       SELECT p.method, SUM(p.amount) AS metodTotal
       FROM "Sale" s
       JOIN "Payment" p ON p."salePublicId" = s."publicId"
-      WHERE s.status = 'COMPLETED'
-        AND DATE(s."createdAt") = DATE('now', 'localtime')
-        AND s."cashierId" = ?
+      WHERE s.status = 'COMPLETED' AND s."createdAt" >= ?
       GROUP BY p.method
-    `).all(cashierId) as MethodRow[]
+    `).all(session.openedAt) as MethodRow[]
 
     const byMethod: Record<string, number> = {}
-    for (const row of rows) {
+    for (const row of methodRows) {
       if (row.method) byMethod[row.method] = row.metodTotal ?? 0
     }
 
+    const totalEfectivo = byMethod['efectivo'] ?? 0
+    const expected = session.initialCash + totalEfectivo + totalEntradas - totalSalidas
+
     return {
-      totalVentas: totals.totalVentas ?? 0,
-      tickets:     totals.tickets     ?? 0,
+      sessionId:     session.id,
+      openedAt:      session.openedAt,
+      initialCash:   session.initialCash,
+      expected,
+      totalEfectivo,
+      totalEntradas,
+      totalSalidas,
+      movements,
       byMethod,
-      generatedAt: new Date().toISOString(),
+      totalVentas:   saleTots.totalVentas ?? 0,
+      tickets:       saleTots.tickets     ?? 0,
+      generatedAt:   now,
     }
+  })
+
+  ipcMain.handle('sales:confirmCorte', (_event, _cashierId: number, countedCash?: number) => {
+    const db = getLocalDb()
+    const now = new Date().toISOString()
+
+    const session = db.prepare(`
+      SELECT id, "openedAt", "initialCash"
+      FROM "CashSession"
+      WHERE "closedAt" IS NULL
+      ORDER BY id DESC
+      LIMIT 1
+    `).get() as { id: number; openedAt: string; initialCash: number } | undefined
+
+    if (!session) {
+      return { ok: false as const, error: 'No hay sesión de caja activa.' }
+    }
+
+    type MovRow = { type: string; amount: number }
+    const movements = db.prepare(`
+      SELECT type, amount FROM "CashMovement" WHERE "sessionId" = ?
+    `).all(session.id) as MovRow[]
+
+    const totalEntradas = movements.filter(m => m.type === 'IN').reduce((s, m) => s + m.amount, 0)
+    const totalSalidas  = movements.filter(m => m.type === 'OUT').reduce((s, m) => s + m.amount, 0)
+
+    type EffRow = { totalEfectivo: number | null }
+    const eff = db.prepare(`
+      SELECT SUM(p.amount) AS totalEfectivo
+      FROM "Sale" s
+      JOIN "Payment" p ON p."salePublicId" = s."publicId"
+      WHERE s.status = 'COMPLETED' AND s."createdAt" >= ? AND p.method = 'efectivo'
+    `).get(session.openedAt) as EffRow
+
+    const expected = session.initialCash + (eff.totalEfectivo ?? 0) + totalEntradas - totalSalidas
+    const diff = countedCash !== undefined ? countedCash - expected : null
+
+    db.prepare(`
+      UPDATE "CashSession"
+      SET "closedAt" = ?, "counted" = ?, "diff" = ?, "updatedAt" = ?
+      WHERE id = ?
+    `).run(now, countedCash !== undefined ? countedCash : null, diff, now, session.id)
+
+    return { ok: true as const, sessionId: session.id }
+  })
+
+  ipcMain.handle('sales:cashMovement', (_event, payload: { type: 'IN' | 'OUT'; amount: number; reason?: string }) => {
+    const db = getLocalDb()
+    const now = new Date().toISOString()
+
+    const session = db.prepare(`
+      SELECT id FROM "CashSession" WHERE "closedAt" IS NULL ORDER BY id DESC LIMIT 1
+    `).get() as { id: number } | undefined
+
+    if (!session) {
+      return { ok: false as const, error: 'No hay sesión de caja activa.' }
+    }
+
+    const { lastInsertRowid } = db.prepare(`
+      INSERT INTO "CashMovement" ("sessionId", type, amount, reason, "createdAt")
+      VALUES (?, ?, ?, ?, ?)
+    `).run(session.id, payload.type, payload.amount, payload.reason ?? null, now)
+
+    return { ok: true as const, id: Number(lastInsertRowid) }
   })
 
   ipcMain.handle('sales:recent', (_event, limit = 30) => {

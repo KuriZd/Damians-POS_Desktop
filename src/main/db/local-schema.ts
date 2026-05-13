@@ -45,6 +45,50 @@ CREATE TABLE IF NOT EXISTS "Category" (
   "deletedAt" TEXT
 );
 
+CREATE TABLE IF NOT EXISTS "CashClose" (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  "publicId" TEXT NOT NULL UNIQUE,
+  "cashierId" INTEGER NOT NULL,
+  tickets INTEGER NOT NULL,
+  "totalSales" INTEGER NOT NULL,
+  "byMethodJson" TEXT NOT NULL DEFAULT '{}',
+  "countedCash" INTEGER,
+  "diffCash" INTEGER,
+  "rangeFrom" TEXT,
+  "rangeTo" TEXT,
+  "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY("cashierId") REFERENCES "User"(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cashclose_cashier ON "CashClose"("cashierId", "createdAt");
+
+CREATE TABLE IF NOT EXISTS "CashSession" (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  "cashierId" INTEGER,
+  "openedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "closedAt" TEXT,
+  "initialCash" INTEGER NOT NULL DEFAULT 0,
+  "counted" INTEGER,
+  "diff" INTEGER,
+  "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY("cashierId") REFERENCES "User"(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cashsession_active ON "CashSession"("closedAt");
+
+CREATE TABLE IF NOT EXISTS "CashMovement" (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  "sessionId" INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  reason TEXT,
+  "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY("sessionId") REFERENCES "CashSession"(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cashmovement_session ON "CashMovement"("sessionId");
+
 CREATE TABLE IF NOT EXISTS "Sale" (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   "publicId" TEXT NOT NULL UNIQUE,
@@ -53,10 +97,12 @@ CREATE TABLE IF NOT EXISTS "Sale" (
   subtotal INTEGER NOT NULL,
   total INTEGER NOT NULL,
   "cashierId" INTEGER NOT NULL,
+  "corteId" INTEGER,
   "originDeviceId" TEXT,
   "syncedAt" TEXT,
   "createdAt" TEXT NOT NULL,
-  "updatedAt" TEXT NOT NULL
+  "updatedAt" TEXT NOT NULL,
+  FOREIGN KEY("corteId") REFERENCES "CashClose"(id)
 );
 
 -- itemType values: 'PRODUCT' | 'SERVICE'  (uppercase, mirrors Supabase enum)
@@ -248,4 +294,6 @@ ALTER TABLE "InventoryMovement" ADD COLUMN "updatedAt" TEXT;
 ALTER TABLE "Service" ADD COLUMN "taxRateBp" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "ServiceSupply" ADD COLUMN "createdAt" TEXT;
 ALTER TABLE "ServiceSupply" ADD COLUMN "updatedAt" TEXT;
+
+ALTER TABLE "Sale" ADD COLUMN "corteId" INTEGER;
 `

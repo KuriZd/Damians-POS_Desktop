@@ -1355,10 +1355,44 @@
 
 .corteFooter {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 14px 24px;
   border-top: 1.5px solid #f0f2f8;
   flex-shrink: 0;
+}
+
+.corteFooterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.corteRetiroBtn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #d7dbe6;
+  background: #f4f6fb;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #374263;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.corteRetiroBtn:hover:not(:disabled) {
+  background: #fff0e6;
+  border-color: #f97316;
+  color: #c2410c;
+}
+
+.corteRetiroBtn:disabled {
+  color: #b0b8cc;
+  border-color: #e2e6f0;
+  background: #f9fafb;
+  cursor: not-allowed;
 }
 
 .corteCloseBtn {
@@ -1378,6 +1412,243 @@
   border-color: #5b79ff;
   color: #5b79ff;
 }
+
+.corteCancelBtn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1.5px solid #d7dbe6;
+  background: #f4f6fb;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6a7190;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.corteCancelBtn:hover:not(:disabled) {
+  background: #eef2ff;
+}
+
+.corteCancelBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.corteConfirmBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 22px;
+  border-radius: 8px;
+  border: none;
+  background: #3b5bdb;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s, opacity 0.12s;
+}
+
+.corteConfirmBtn:hover:not(:disabled) {
+  background: #2f4ac9;
+}
+
+.corteConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.corteSuccess {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 12px;
+}
+
+.corteSuccessIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #d1fae5;
+  color: #059669;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.corteSuccessTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.corteSuccessSub {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.corteSectionOptional {
+  font-size: 11px;
+  font-weight: 400;
+  color: #9aa3bb;
+}
+
+.corteError {
+  margin: 0 0 4px;
+  padding: 10px 14px;
+  background: #fff1f1;
+  border: 1.5px solid #fca5a5;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.corteAuth {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.corteAuthTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1f36;
+  margin: 0;
+}
+
+.corteAuthSub {
+  font-size: 13px;
+  color: #6a7190;
+  margin: 0;
+}
+
+.corteAuthForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.corteAuthField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.corteAuthLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374263;
+}
+
+.corteAuthInput {
+  padding: 9px 13px;
+  border: 1.5px solid #d7dbe6;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.corteAuthInput:focus {
+  border-color: #5b79ff;
+}
+
+.corteArqueoExpected {
+  border-top: 1px solid #e2e6f0;
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+.corteNoMovements {
+  font-size: 13px;
+  color: #9aa3bb;
+  margin: 0;
+  padding: 10px 0;
+}
+
+.corteMovList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1.5px solid #eaedfa;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.corteMovRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  background: #fafbff;
+  border-bottom: 1px solid #f0f2f8;
+}
+
+.corteMovRow:last-of-type {
+  border-bottom: none;
+}
+
+.corteMovType {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.corteMovIn .corteMovType {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.corteMovOut .corteMovType {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.corteMovReason {
+  flex: 1;
+  color: #374263;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.corteMovAmt {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.corteMovIn .corteMovAmt {
+  color: #059669;
+}
+
+.corteMovOut .corteMovAmt {
+  color: #dc2626;
+}
+
+.corteMovTotals {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 14px;
+  font-size: 12px;
+  color: #6a7190;
+  background: #f4f6fb;
+  border-top: 1px solid #eaedfa;
+}
+
 
 /* ─── Hist ───────────────────────────────────────────────────────────────── */
 
