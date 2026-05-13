@@ -45,6 +45,50 @@ type RecentSale = {
   paymentMethod: string
 }
 
+type CashMovementItem = {
+  id: number
+  type: string
+  amount: number
+  reason: string | null
+  createdAt: string
+}
+
+type CorteData = {
+  sessionId: number
+  openedAt: string
+  initialCash: number
+  expected: number
+  totalEfectivo: number
+  totalEntradas: number
+  totalSalidas: number
+  movements: CashMovementItem[]
+  byMethod: Record<string, number>
+  totalVentas: number
+  tickets: number
+  generatedAt: string
+}
+
+type DiagnosticResult = {
+  supabaseUrl: string
+  checkedAt: string
+  connection: {
+    anon: { ok: boolean; ms: number; error?: string }
+    admin: { ok: boolean; ms: number; error?: string }
+  }
+  local: {
+    salesTotal: number
+    salesUnsynced: number
+    movementsUnsynced: number
+    lastSyncedAt: string | null
+  }
+  remote: {
+    sales: number | null
+    products: number | null
+    error?: string
+  }
+  unsyncedSales: { id: number; folio: string; total: number; createdAt: string }[]
+}
+
 type InventoryMovementPayload = {
   productId: number; type: 'entrada' | 'ajuste' | 'merma' | 'devolucion'
   qty: number; realQty?: number; userId?: number; note?: string
@@ -93,6 +137,10 @@ interface Window {
       login: (username: string, password: string) => Promise<AuthUser | null>
       me: () => Promise<AuthUser | null>
       logout: () => Promise<{ ok: boolean }>
+      verifySupervisor: (username: string, password: string) => Promise<
+        | { ok: true; name: string; role: string }
+        | { ok: false; error: string }
+      >
     }
     products: {
       findByCode: (code: string) => Promise<ProductLookup | null>
@@ -136,12 +184,15 @@ interface Window {
         total?: number
         payment: { method: string; amount: number }
       }) => Promise<{ ok: true; folio: string; salePublicId: string }>
-      corte: (cashierId: number) => Promise<{
-        totalVentas: number
-        tickets: number
-        byMethod: Record<string, number>
-        generatedAt: string
-      }>
+      corte: (cashierId: number) => Promise<CorteData>
+      confirmCorte: (cashierId: number, countedCash?: number) => Promise<
+        | { ok: true; sessionId: number }
+        | { ok: false; error: string }
+      >
+      cashMovement: (payload: { type: 'IN' | 'OUT'; amount: number; reason?: string }) => Promise<
+        | { ok: true; id: number }
+        | { ok: false; error: string }
+      >
     }
     sync: {
       pullProducts: () => Promise<{ ok: boolean; count: number }>
@@ -154,6 +205,7 @@ interface Window {
       }>
       pushPending: () => Promise<{ ok: boolean; pushed: number; failed: number }>
       conflicts: () => Promise<SyncConflict[]>
+      diagnose: () => Promise<DiagnosticResult>
     }
   }
 }

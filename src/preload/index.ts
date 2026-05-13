@@ -11,7 +11,9 @@ contextBridge.exposeInMainWorld('pos', {
     login: (username: string, password: string) =>
       ipcRenderer.invoke('auth:login', username, password),
     me: () => ipcRenderer.invoke('auth:me'),
-    logout: () => ipcRenderer.invoke('auth:logout')
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    verifySupervisor: (username: string, password: string) =>
+      ipcRenderer.invoke('auth:verifySupervisor', username, password),
   },
   products: {
     findByCode: (code: string) => ipcRenderer.invoke('products:findByCode', code),
@@ -41,14 +43,17 @@ contextBridge.exposeInMainWorld('pos', {
     stats: () => ipcRenderer.invoke('dashboard:stats'),
   },
   sales: {
-    create:  (payload: unknown) => ipcRenderer.invoke('sales:create', payload),
-    recent:  (limit?: number)   => ipcRenderer.invoke('sales:recent', limit),
-    corte:   (cashierId: number) => ipcRenderer.invoke('sales:corte', cashierId),
+    create:        (payload: unknown)                        => ipcRenderer.invoke('sales:create', payload),
+    recent:        (limit?: number)                          => ipcRenderer.invoke('sales:recent', limit),
+    corte:         (cashierId: number)                       => ipcRenderer.invoke('sales:corte', cashierId),
+    confirmCorte:  (cashierId: number, countedCash?: number) => ipcRenderer.invoke('sales:confirmCorte', cashierId, countedCash),
+    cashMovement:  (payload: unknown)                        => ipcRenderer.invoke('sales:cashMovement', payload),
   },
   sync: {
     pullProducts: () => ipcRenderer.invoke('sync:pullProducts'),
-    pullAll: () => ipcRenderer.invoke('sync:pullAll'),
-    pushPending: () => ipcRenderer.invoke('sync:pushPending'),
-    conflicts: () => ipcRenderer.invoke('sync:conflicts')
+    pullAll:      () => ipcRenderer.invoke('sync:pullAll'),
+    pushPending:  () => ipcRenderer.invoke('sync:pushPending'),
+    conflicts:    () => ipcRenderer.invoke('sync:conflicts'),
+    diagnose:     () => ipcRenderer.invoke('sync:diagnose'),
   }
 })
