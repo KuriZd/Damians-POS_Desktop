@@ -1,3 +1,133 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+## Commands
+
+```bash
+npm run dev          # Start Electron + Vite dev server with HMR
+npm run build        # Full TypeScript check + electron-vite build
+npm run typecheck    # Run both node and web TypeScript checks
+npm run lint         # ESLint with cache
+npm run format       # Prettier formatting
+npm run rebuild:native  # Rebuild better-sqlite3 after Node/Electron version change
+npm run build:win    # Build NSIS installer for Windows
+```
+
+No automated test suite exists yet (no jest/vitest/playwright configured).
+
+---
+
+## Architecture
+
+This is a **local-first POS desktop app** (Electron + React 19 + TypeScript + SQLite + Supabase). It runs in three processes:
+
+### Main Process (`src/main/`)
+- Owns the SQLite database (`better-sqlite3`) at `app.getPath('userData')/data/pos-local.db`
+- Registers all IPC handlers in `src/main/ipc/*.ipc.ts` (one file per domain)
+- Holds the privileged Supabase admin client (`src/main/supabase/client.ts`)
+- Window config: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false` (required for better-sqlite3)
+
+### Preload Process (`src/preload/index.ts`)
+- Exposes `window.pos` via `contextBridge` — the **only** communication surface to the renderer
+- All IPC calls flow through `ipcRenderer.invoke()`; the renderer never calls Node directly
+- Type definitions in `src/preload/index.d.ts`
+
+### Renderer Process (`src/renderer/src/`)
+- React 19 SPA with CSS Modules; no global state manager (React hooks + localStorage only)
+- `App.tsx` restores session and routes between `LoginPage` and `AppLayout`
+- `AppLayout` mounts sidebar, top nav, auto-sync (`useSync` hook), and module routing
+- Path alias: `@renderer/*` → `src/renderer/src/*`
+
+---
+
+## IPC Pattern
+
+Every feature domain follows the same three-layer pattern:
+
+```
+src/main/ipc/{domain}.ipc.ts   ← ipcMain.handle() registrations
+src/preload/index.ts           ← window.pos.{domain}.{method}()
+src/renderer/src/pages/        ← UI calling window.pos.*
+```
+
+Existing domains: `auth`, `dashboard`, `inventory`, `products`, `sales`, `services`, `sync`, `users`.
+
+To add a new IPC endpoint: add the handler in `src/main/ipc/`, expose it in preload, and register in `src/main/index.ts`.
+
+---
+
+## Database
+
+**Local SQLite** (via better-sqlite3):
+- Schema and migration logic in `src/main/db/local-schema.ts`
+- WAL journal mode, foreign keys enabled
+- Migration runs on app start: pre-schema renames → DDL → post-schema backfills
+- All monetary amounts stored as **integer centavos** (not floats)
+
+**Remote Supabase** (catalog only):
+- Two clients: `supabase` (anon key, public RPC) and `supabaseAdmin` (service role, user management only)
+- `supabaseAdmin` must **never** be used from the renderer
+- Runtime config loaded via `src/shared/runtime-config.ts` (reads from `POS_RUNTIME_CONFIG_PATH`, `.env`, or `pos-runtime.env`)
+
+**Sync** (pull-only today):
+- `useSync` hook calls `window.pos.sync.pullAll()` on mount and every 6 hours
+- `pullAll()` replaces local Category, Product, Service, ServiceSupply from Supabase
+- Push pipeline (`pushPending`) and conflict resolution are scaffolded but not implemented
+
+---
+
+## Key Data Model Notes
+
+- `SaleItem` uses `unitPrice` (not `price`); stores `lineSubtotal`, `lineTax`, `lineCostTotal`, `lineProfit`
+- `SaleItem` and `InventoryMovement` store **snapshots** of catalog data at time of sale for historical traceability
+- `InventoryMovement.sourceType` values: `SALE`, `SALE_CANCEL`, `SERVICE_CONSUMPTION`, `PURCHASE`, `ADJUSTMENT`, `RETURN`, `OPENING_STOCK`, `MANUAL`
+- `itemType` is normalized to `PRODUCT` or `SERVICE` everywhere
+
+---
+
+## Role-Based Access
+
+| Role | Modules |
+|---|---|
+| `ADMIN` | dashboard, products, inventory, sales, users |
+| `SUPERVISOR` | dashboard, products, inventory, sales, users |
+| `CASHIER` | sales only |
+
+---
+
+## Environment Variables
+
+```env
+# Main process only (never expose to renderer)
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Renderer (VITE_ prefix required for vite to expose)
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+---
+
+## Known Incomplete Areas
+
+- `pushPending()` returns `{ pushed: 0, failed: 0 }` — no real push pipeline
+- `conflicts()` always returns `conflictCount: 0`
+- "Corte de caja" is stubbed in the UI but not implemented
+- Several UI files have text encoding issues (special characters)
+
+---
+
+## Supabase Schema (Remote)
+
+See `CLAUDE.md` SQL block below for the canonical migration that defines `SaleItem` and `InventoryMovement` columns, constraints, indexes, and the `vw_ItemSalesAudit` view used in production.
+
+---
+
 esta es la base de datos que estamos utilizando en supabase begin;
 
 do $$
