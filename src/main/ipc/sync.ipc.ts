@@ -598,6 +598,106 @@ async function pullRemoteCatalog(): Promise<{
 }
 
 export function registerSyncIpc(): void {
+  ipcMain.handle('sync:diagnose', async () => {
+    const db = getLocalDb()
+    const checkedAt = new Date().toISOString()
+
+    // ── Supabase URL ────────────────────────────────────────────
+    const supabaseUrl: string = (supabaseAdmin as unknown as { supabaseUrl?: string }).supabaseUrl
+      ?? (supabase as unknown as { supabaseUrl?: string }).supabaseUrl
+      ?? 'desconocido'
+
+    // ── Test conexión anon ───────────────────────────────────────
+    let anonOk = false
+    let anonMs = 0
+    let anonError: string | undefined
+    try {
+      const t0 = Date.now()
+      const { error } = await supabase.from('Product').select('id').limit(1)
+      anonMs = Date.now() - t0
+      if (error) { anonError = error.message } else { anonOk = true }
+    } catch (e) {
+      anonError = e instanceof Error ? e.message : String(e)
+    }
+
+    // ── Test conexión admin (service role) ───────────────────────
+    let adminOk = false
+    let adminMs = 0
+    let adminError: string | undefined
+    try {
+      const t0 = Date.now()
+      const { error } = await supabaseAdmin.from('Sale').select('id').limit(1)
+      adminMs = Date.now() - t0
+      if (error) { adminError = error.message } else { adminOk = true }
+    } catch (e) {
+      adminError = e instanceof Error ? e.message : String(e)
+    }
+
+    // ── Estadísticas locales ─────────────────────────────────────
+    const { salesTotal } = db.prepare(
+      `SELECT COUNT(*) AS salesTotal FROM "Sale"`
+    ).get() as { salesTotal: number }
+
+    const { salesUnsynced } = db.prepare(
+      `SELECT COUNT(*) AS salesUnsynced FROM "Sale" WHERE "syncedAt" IS NULL`
+    ).get() as { salesUnsynced: number }
+
+    const { movementsUnsynced } = db.prepare(
+      `SELECT COUNT(*) AS movementsUnsynced FROM "InventoryMovement" WHERE "syncedAt" IS NULL AND "saleId" IS NULL`
+    ).get() as { movementsUnsynced: number }
+
+    const lastSynced = db.prepare(
+      `SELECT MAX("syncedAt") AS ts FROM "Sale" WHERE "syncedAt" IS NOT NULL`
+    ).get() as { ts: string | null }
+
+    // ── Estadísticas remotas ─────────────────────────────────────
+    let remoteSales: number | null = null
+    let remoteProducts: number | null = null
+    let remoteError: string | undefined
+
+    if (adminOk) {
+      try {
+        const [salesRes, productsRes] = await Promise.all([
+          supabaseAdmin.from('Sale').select('id', { count: 'exact', head: true }),
+          supabaseAdmin.from('Product').select('id', { count: 'exact', head: true }),
+        ])
+        if (salesRes.error) { remoteError = salesRes.error.message }
+        else { remoteSales = salesRes.count ?? 0 }
+        if (!productsRes.error) { remoteProducts = productsRes.count ?? 0 }
+      } catch (e) {
+        remoteError = e instanceof Error ? e.message : String(e)
+      }
+    }
+
+    // ── Últimas 5 ventas sin sincronizar ─────────────────────────
+    type UnsyncedRow = { id: number; folio: string; total: number; createdAt: string }
+    const unsyncedSales = db.prepare(
+      `SELECT id, folio, total, "createdAt" FROM "Sale" WHERE "syncedAt" IS NULL ORDER BY "createdAt" DESC LIMIT 5`
+    ).all() as UnsyncedRow[]
+
+    return {
+      supabaseUrl,
+      checkedAt,
+      connection: {
+        anon:  { ok: anonOk,  ms: anonMs,  error: anonError },
+        admin: { ok: adminOk, ms: adminMs, error: adminError },
+      },
+      local: {
+        salesTotal,
+        salesUnsynced,
+        movementsUnsynced,
+        lastSyncedAt: lastSynced.ts ?? null,
+      },
+      remote: {
+        sales:    remoteSales,
+        products: remoteProducts,
+        error:    remoteError,
+      },
+      unsyncedSales,
+    }
+  })
+
+
   ipcMain.handle('sync:pullProducts', async () => {
     const counts = await pullRemoteCatalog()
     return { ok: true, count: counts.products }

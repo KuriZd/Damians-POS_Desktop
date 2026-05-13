@@ -1,7 +1,8 @@
 // src/renderer/src/components/layout/TopNav.tsx
-import { type ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import styles from './TopNav.module.css'
 import type { SyncStatus } from '../../hooks/useSync'
+import DiagnosticModal from './DiagnosticModal'
 
 type TopNavProps = {
     user: AuthUser
@@ -58,14 +59,18 @@ function syncColor(status: SyncStatus): string {
 }
 
 export default function TopNav({
+    user,
     title,
     syncStatus,
     lastSyncAt,
     conflictCount,
     onSyncNow,
 }: TopNavProps): ReactElement {
+    const [diagOpen, setDiagOpen] = useState(false)
+
     return (
         <header className={styles.topNav}>
+        {diagOpen && <DiagnosticModal onClose={() => setDiagOpen(false)} />}
 
             {/* ─── Izquierda: título + breadcrumb ─────────────────── */}
             <div className={styles.titleBlock}>
@@ -90,6 +95,21 @@ export default function TopNav({
                 >
                     <SyncIcon spinning={syncStatus === 'syncing'} />
                 </button>
+
+                {user.role === 'ADMIN' && <button
+                    type="button"
+                    className={styles.actionButton}
+                    onClick={() => setDiagOpen(true)}
+                    title="Diagnóstico de Supabase"
+                    aria-label="Diagnóstico de Supabase"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                </button>}
 
                 <button
                     type="button"
