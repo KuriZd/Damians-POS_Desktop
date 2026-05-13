@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import styles from './SalesPage.module.css'
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 import { formatMXN } from '../lib/formatters'
 import {
   FiSearch,
@@ -31,7 +32,7 @@ import { FaHandshake } from 'react-icons/fa'
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type ItemType = 'product' | 'service'
-type FilterKey = 'none' | 'age' | 'alpha' | 'products' | 'services'
+type FilterKey = 'none' | 'age' | 'products' | 'services'
 type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'mixto'
 type ServiceSize = 'carta' | 'oficio'
 
@@ -43,8 +44,10 @@ type CatalogItem = {
   type: ItemType
   stock?: number
   sku?: string
+  barcode?: string | null
   code?: string
   hasSize?: boolean
+  loadOrder: number
 }
 
 type CartEntry = {
@@ -63,33 +66,57 @@ type CartEntry = {
 
 async function loadCatalog(): Promise<CatalogItem[]> {
   const items: CatalogItem[] = []
+  const pageSize = 500
 
   try {
-    const result = await window.pos.products.list({ page: 1, pageSize: 200, active: true })
-    for (const p of result.items) {
-      items.push({
-        id: p.id,
-        publicId: p.publicId,
-        name: p.name,
-        price: p.price,
-        type: 'product',
-        stock: p.stock ?? undefined,
-        sku: p.sku,
-      })
+    let page = 1
+    let total = Number.POSITIVE_INFINITY
+
+    while ((page - 1) * pageSize < total) {
+      const result = await window.pos.products.list({ page, pageSize, active: true })
+      total = result.total
+
+      for (const p of result.items) {
+        items.push({
+          id: p.id,
+          publicId: p.publicId,
+          name: p.name,
+          price: p.price,
+          type: 'product',
+          stock: p.stock ?? undefined,
+          sku: p.sku,
+          barcode: p.barcode,
+          loadOrder: items.length,
+        })
+      }
+
+      if (result.items.length === 0) break
+      page += 1
     }
   } catch { /* sin productos locales */ }
 
   try {
-    const result = await window.pos.services.list({ page: 1, pageSize: 200, active: true })
-    for (const s of result.items) {
-      items.push({
-        id: s.id,
-        publicId: s.publicId ?? s.code,
-        name: s.name,
-        price: s.price,
-        type: 'service',
-        code: s.code,
-      })
+    let page = 1
+    let total = Number.POSITIVE_INFINITY
+
+    while ((page - 1) * pageSize < total) {
+      const result = await window.pos.services.list({ page, pageSize, active: true })
+      total = result.total
+
+      for (const s of result.items) {
+        items.push({
+          id: s.id,
+          publicId: s.publicId ?? s.code,
+          name: s.name,
+          price: s.price,
+          type: 'service',
+          code: s.code,
+          loadOrder: items.length,
+        })
+      }
+
+      if (result.items.length === 0) break
+      page += 1
     }
   } catch { /* sin servicios locales */ }
 
@@ -101,6 +128,23 @@ async function loadCatalog(): Promise<CatalogItem[]> {
 const fmt = (n: number): string => formatMXN(n)
 
 const uid = (): string => Math.random().toString(36).slice(2)
+
+function normalizeSearch(value: string): string {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+function matchesCatalogQuery(item: CatalogItem, query: string): boolean {
+  return (
+    normalizeSearch(item.name).includes(query) ||
+    normalizeSearch(item.sku ?? '').includes(query) ||
+    normalizeSearch(item.barcode ?? '').includes(query) ||
+    normalizeSearch(item.code ?? '').includes(query)
+  )
+}
 
 function nowStr(): { date: string; time: string } {
   const d = new Date()
@@ -141,7 +185,6 @@ function SalesHeader({ search, onSearch, onSearchKeyDown, searchRef, cashierName
           value={search}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onSearch(e.target.value)}
           onKeyDown={onSearchKeyDown}
-          autoFocus
         />
         {search && (
           <button className={styles.searchClear} onClick={() => onSearch('')} aria-label="Limpiar">
@@ -183,7 +226,6 @@ type SalesFiltersProps = {
 const FILTERS: { key: FilterKey; label: string; icon: ReactElement }[] = [
   { key: 'none',     label: 'Todos',          icon: <FiAlignLeft size={13} /> },
   { key: 'age',      label: 'Recientes',       icon: <FiClock size={13} /> },
-  { key: 'alpha',    label: 'A–Z',             icon: <span style={{ fontSize: 11, fontWeight: 700 }}>Az</span> },
   { key: 'products', label: 'Solo productos',  icon: <AiOutlineProduct size={13} /> },
   { key: 'services', label: 'Solo servicios',  icon: <FaHandshake size={12} /> },
 ]
@@ -709,6 +751,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [scanMode, setScanMode] = useState(false)
   const [filter, setFilter] = useState<FilterKey>('none')
   const [cart, setCart] = useState<CartEntry[]>([])
   const [payMethod, setPayMethod] = useState<PaymentMethod>('efectivo')
@@ -740,31 +783,40 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   const filtered = useMemo<CatalogItem[]>(() => {
     let items = catalog
 
-    const q = search.trim().toLowerCase()
+    const q = normalizeSearch(search)
     if (q) {
-      items = items.filter(
-        i =>
-          i.name.toLowerCase().includes(q) ||
-          (i.sku?.toLowerCase().includes(q) ?? false) ||
-          (i.code?.toLowerCase().includes(q) ?? false)
-      )
+      items = scanMode
+        ? items.filter(
+            i =>
+              normalizeSearch(i.sku ?? '') === q ||
+              normalizeSearch(i.barcode ?? '') === q ||
+              normalizeSearch(i.code ?? '') === q
+          )
+        : items.filter(i => matchesCatalogQuery(i, q))
     }
 
     if (filter === 'products') items = items.filter(i => i.type === 'product')
     if (filter === 'services') items = items.filter(i => i.type === 'service')
 
     const copy = [...items]
-    if (filter === 'alpha') copy.sort((a, b) => a.name.localeCompare(b.name, 'es'))
-    if (filter === 'age') copy.sort((a, b) => b.id - a.id)
+    if (filter === 'age') {
+      copy.sort((a, b) => a.loadOrder - b.loadOrder)
+    } else {
+      copy.sort((a, b) => {
+        const na = a.name.toLowerCase()
+        const nb = b.name.toLowerCase()
+        return na < nb ? -1 : na > nb ? 1 : 0
+      })
+    }
 
     return copy
-  }, [catalog, search, filter])
+  }, [catalog, search, scanMode, filter])
 
   // ── Cart ops ─────────────────────────────────────────────────
 
   const addToCart = useCallback((item: CatalogItem) => {
     setCart(prev => {
-      const existing = prev.find(e => e.itemId === item.id)
+      const existing = prev.find(e => e.type === item.type && e.itemId === item.id)
       if (existing) {
         return prev.map(e => e.uid === existing.uid ? { ...e, qty: e.qty + 1 } : e)
       }
@@ -823,6 +875,45 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     if (e.key === 'Escape') setSearch('')
   }, [])
 
+  // ── Barcode / QR scanner ─────────────────────────────────────
+  function handleSalesScan(raw: string): void {
+    if (historialOpen || corteOpen) return
+
+    let code = raw.trim()
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        'sku' in parsed &&
+        typeof (parsed as Record<string, unknown>).sku === 'string'
+      ) {
+        code = (parsed as { sku: string }).sku
+      }
+    } catch {
+      // plain barcode — use as-is
+    }
+
+    if (!code) return
+
+    const normalizedCode = code.toLowerCase()
+    const exactMatch = catalog.find(
+      item =>
+        item.sku?.toLowerCase() === normalizedCode ||
+        item.barcode?.toLowerCase() === normalizedCode ||
+        item.code?.toLowerCase() === normalizedCode
+    )
+
+    setScanMode(true)
+    setSearch(code)
+
+    if (exactMatch && exactMatch.stock !== 0) {
+      addToCart(exactMatch)
+    }
+  }
+
+  useBarcodeScanner(handleSalesScan)
+
   const handleCharge = useCallback(async () => {
     if (cart.length === 0 || charging) return
     setCharging(true)
@@ -876,7 +967,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
       <SalesHeader
         search={search}
-        onSearch={setSearch}
+        onSearch={(v) => { setScanMode(false); setSearch(v) }}
         onSearchKeyDown={handleSearchKeyDown}
         searchRef={searchRef}
         cashierName={user.name}
@@ -912,7 +1003,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
           ) : (
             <div className={styles.grid}>
               {filtered.map(item => (
-                <ProductCard key={item.id} item={item} onAdd={addToCart} />
+                <ProductCard key={`${item.type}-${item.id}`} item={item} onAdd={addToCart} />
               ))}
             </div>
           )}

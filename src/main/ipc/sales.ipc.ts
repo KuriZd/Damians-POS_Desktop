@@ -49,9 +49,27 @@ function movementTypeFromSource(sourceType: string): 'IN' | 'OUT' {
   }
 }
 
-function generateFolio(db: ReturnType<typeof getLocalDb>): string {
-  const { count } = db.prepare(`SELECT COUNT(*) as count FROM "Sale"`).get() as { count: number }
-  return `VTA-${String(count + 1).padStart(5, '0')}`
+function getOrCreateDeviceId(db: ReturnType<typeof getLocalDb>): string {
+  const current = db.prepare(
+    `SELECT device_id as deviceId FROM device_config ORDER BY id LIMIT 1`
+  ).get() as { deviceId: string } | undefined
+
+  if (current?.deviceId) return current.deviceId
+
+  const deviceId = crypto.randomUUID()
+  db.prepare(
+    `INSERT INTO device_config (device_id, device_name) VALUES (?, ?)`
+  ).run(deviceId, 'Caja local')
+
+  return deviceId
+}
+
+function generateFolio(salePublicId: string, createdAt: string, deviceId: string): string {
+  const datePart = createdAt.slice(0, 10).replace(/-/g, '')
+  const devicePart = deviceId.replace(/-/g, '').slice(0, 4).toUpperCase()
+  const salePart = salePublicId.replace(/-/g, '').slice(0, 8).toUpperCase()
+
+  return `VTA-${datePart}-${devicePart}-${salePart}`
 }
 
 export function registerSalesIpc(): void {
@@ -59,7 +77,8 @@ export function registerSalesIpc(): void {
     const db = getLocalDb()
     const now = new Date().toISOString()
     const salePublicId = crypto.randomUUID()
-    const folio = generateFolio(db)
+    const originDeviceId = getOrCreateDeviceId(db)
+    const folio = generateFolio(salePublicId, now, originDeviceId)
     const saleColumns = db.prepare(`PRAGMA table_info("Sale")`).all() as Array<{ name: string }>
     const hasLegacyTaxColumn = saleColumns.some((column) => column.name === 'tax')
 
@@ -142,15 +161,15 @@ export function registerSalesIpc(): void {
       if (hasLegacyTaxColumn) {
         db.prepare(`
           INSERT INTO "Sale" ("publicId", folio, status, subtotal, tax, total,
-            "cashierId", "createdAt", "updatedAt")
-          VALUES (?, ?, 'COMPLETED', ?, 0, ?, ?, ?, ?)
-        `).run(salePublicId, folio, saleSubtotal, saleTotal, payload.cashierId, now, now)
+            "cashierId", "originDeviceId", "createdAt", "updatedAt")
+          VALUES (?, ?, 'COMPLETED', ?, 0, ?, ?, ?, ?, ?)
+        `).run(salePublicId, folio, saleSubtotal, saleTotal, payload.cashierId, originDeviceId, now, now)
       } else {
         db.prepare(`
           INSERT INTO "Sale" ("publicId", folio, status, subtotal, total,
-            "cashierId", "createdAt", "updatedAt")
-          VALUES (?, ?, 'COMPLETED', ?, ?, ?, ?, ?)
-        `).run(salePublicId, folio, saleSubtotal, saleTotal, payload.cashierId, now, now)
+            "cashierId", "originDeviceId", "createdAt", "updatedAt")
+          VALUES (?, ?, 'COMPLETED', ?, ?, ?, ?, ?, ?)
+        `).run(salePublicId, folio, saleSubtotal, saleTotal, payload.cashierId, originDeviceId, now, now)
       }
 
       const { id: saleId } = db.prepare(
@@ -235,7 +254,7 @@ export function registerSalesIpc(): void {
               'Venta',
               before, after, payload.cashierId, saleId, saleItemId,
               item.productPublicId, psnap.sku, psnap.name,
-              psnap.cost, null, now, now
+              psnap.cost, originDeviceId, now, now
             )
           }
         } else {
@@ -294,7 +313,7 @@ export function registerSalesIpc(): void {
                 unitsSold: item.qty,
                 supplyQtyPerService: supply.qty
               }),
-              null,
+              originDeviceId,
               now,
               now
             )

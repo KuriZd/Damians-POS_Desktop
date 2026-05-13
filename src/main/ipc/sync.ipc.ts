@@ -81,7 +81,7 @@ type ServiceSupplyRemote = {
 type SaleRow = {
   id: number; publicId: string; folio: string; status: string
   subtotal: number; total: number; cashierId: number
-  createdAt: string; updatedAt: string
+  originDeviceId: string | null; createdAt: string; updatedAt: string
 }
 type SaleItemRow = {
   id: number; publicId: string; salePublicId: string; itemType: string
@@ -140,13 +140,19 @@ function toPaymentMethod(method: string): string {
 
 // ─── Push a single sale (and its items, movements, payment) to Supabase ──────
 
-export async function pushSaleToSupabase(localSaleId: number): Promise<void> {
-  const db = getLocalDb()
+function isDuplicateSaleFolioError(message: string): boolean {
+  return message.includes('Sale_folio_key') || message.toLowerCase().includes('duplicate key')
+}
 
-  const sale = db.prepare(`SELECT * FROM "Sale" WHERE id = ?`).get(localSaleId) as SaleRow | undefined
-  if (!sale) return
+function fallbackFolioForSale(sale: SaleRow): string {
+  const datePart = sale.createdAt.slice(0, 10).replace(/-/g, '')
+  const devicePart = (sale.originDeviceId ?? 'LOCAL').replace(/-/g, '').slice(0, 4).toUpperCase()
+  const salePart = sale.publicId.replace(/-/g, '').slice(0, 8).toUpperCase()
 
-  // Local status → Supabase SaleStatus enum {OPEN, PAID, CANCELED, REFUNDED}
+  return `VTA-${datePart}-${devicePart}-${salePart}`
+}
+
+async function upsertSaleRecord(sale: SaleRow): Promise<void> {
   const STATUS_MAP: Record<string, string> = {
     COMPLETED: 'PAID',
     CANCELLED: 'CANCELED',
@@ -154,8 +160,7 @@ export async function pushSaleToSupabase(localSaleId: number): Promise<void> {
     REFUNDED: 'REFUNDED',
   }
 
-  // 1. Upsert Sale
-  const { error: saleErr } = await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from('Sale')
     .upsert({
       publicId: sale.publicId,
@@ -167,7 +172,32 @@ export async function pushSaleToSupabase(localSaleId: number): Promise<void> {
       createdAt: sale.createdAt,
       updatedAt: sale.updatedAt,
     }, { onConflict: 'publicId' })
-  if (saleErr) throw new Error(`[push:Sale] ${saleErr.message}`)
+
+  if (error) throw new Error(`[push:Sale] ${error.message}`)
+}
+
+export async function pushSaleToSupabase(localSaleId: number): Promise<void> {
+  const db = getLocalDb()
+
+  const sale = db.prepare(`SELECT * FROM "Sale" WHERE id = ?`).get(localSaleId) as SaleRow | undefined
+  if (!sale) return
+
+  // 1. Upsert Sale
+  try {
+    await upsertSaleRecord(sale)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (!isDuplicateSaleFolioError(message)) throw err
+
+    const updatedAt = new Date().toISOString()
+    const newFolio = fallbackFolioForSale(sale)
+    db.prepare(`UPDATE "Sale" SET folio = ?, "updatedAt" = ? WHERE id = ?`)
+      .run(newFolio, updatedAt, localSaleId)
+
+    sale.folio = newFolio
+    sale.updatedAt = updatedAt
+    await upsertSaleRecord(sale)
+  }
 
   // Resolve Supabase integer id (needed as FK for InventoryMovement)
   const { data: saleRemote, error: saleIdErr } = await supabaseAdmin

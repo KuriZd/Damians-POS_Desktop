@@ -208,6 +208,8 @@ CREATE INDEX IF NOT EXISTS idx_saleitem_originalProductId ON "SaleItem"("origina
 // Applied once on existing databases to add new columns without losing data.
 // SQLite 3.37+ supports ADD COLUMN IF NOT EXISTS.
 export const localMigrations = `
+ALTER TABLE "Sale" ADD COLUMN "originDeviceId" TEXT;
+
 ALTER TABLE "SaleItem" ADD COLUMN "originalProductId" INTEGER;
 ALTER TABLE "SaleItem" ADD COLUMN "originalServiceId" INTEGER;
 ALTER TABLE "SaleItem" ADD COLUMN "lineSubtotal" INTEGER;
