@@ -18,15 +18,21 @@ export function registerDashboardIpc(): void {
     type ProfitAgg = { profit: number | null }
     type HeatRow = { date: string; total: number; tickets: number }
 
-    const todayRow = db.prepare(`
+    const todayRow = db
+      .prepare(
+        `
       SELECT SUM(s.total) AS total, COUNT(*) AS tickets, SUM(si.qty) AS units
       FROM "Sale" s
       LEFT JOIN "SaleItem" si ON si."salePublicId" = s."publicId"
                               AND si."itemType" = 'PRODUCT'
       WHERE s.status = 'COMPLETED' AND DATE(s."createdAt") = ?
-    `).get(todayStr) as SaleAgg
+    `
+      )
+      .get(todayStr) as SaleAgg
 
-    const profitRow = db.prepare(`
+    const profitRow = db
+      .prepare(
+        `
       SELECT SUM(COALESCE(si."lineProfit",
         si."lineTotal" - COALESCE(si."lineCostTotal", 0), 0)) AS profit
       FROM "SaleItem" si
@@ -34,21 +40,33 @@ export function registerDashboardIpc(): void {
       WHERE s.status = 'COMPLETED'
         AND DATE(s."createdAt") = ?
         AND si."itemType" = 'PRODUCT'
-    `).get(todayStr) as ProfitAgg
+    `
+      )
+      .get(todayStr) as ProfitAgg
 
-    const weekRow = db.prepare(`
+    const weekRow = db
+      .prepare(
+        `
       SELECT SUM(total) AS total, COUNT(*) AS tickets
       FROM "Sale"
       WHERE status = 'COMPLETED' AND DATE("createdAt") >= ?
-    `).get(weekStr) as { total: number | null; tickets: number }
+    `
+      )
+      .get(weekStr) as { total: number | null; tickets: number }
 
-    const { lowStock } = db.prepare(`
+    const { lowStock } = db
+      .prepare(
+        `
       SELECT COUNT(*) AS lowStock
       FROM "Product"
       WHERE "deletedAt" IS NULL AND active = 1 AND stock <= "stockMin"
-    `).get() as { lowStock: number }
+    `
+      )
+      .get() as { lowStock: number }
 
-    const heatmap = db.prepare(`
+    const heatmap = db
+      .prepare(
+        `
       SELECT DATE("createdAt") AS date,
              SUM(total)        AS total,
              COUNT(*)          AS tickets
@@ -56,21 +74,23 @@ export function registerDashboardIpc(): void {
       WHERE status = 'COMPLETED' AND DATE("createdAt") >= ?
       GROUP BY DATE("createdAt")
       ORDER BY date ASC
-    `).all(yearStr) as HeatRow[]
+    `
+      )
+      .all(yearStr) as HeatRow[]
 
     return {
       today: {
-        total:   todayRow.total   ?? 0,
+        total: todayRow.total ?? 0,
         tickets: todayRow.tickets ?? 0,
-        units:   todayRow.units   ?? 0,
+        units: todayRow.units ?? 0
       },
       todayProfit: profitRow.profit ?? 0,
       week: {
-        total:   weekRow.total   ?? 0,
-        tickets: weekRow.tickets ?? 0,
+        total: weekRow.total ?? 0,
+        tickets: weekRow.tickets ?? 0
       },
       lowStock,
-      heatmap,
+      heatmap
     }
   })
 }

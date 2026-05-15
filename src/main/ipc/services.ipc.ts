@@ -33,7 +33,9 @@ type CreateServicePayload = {
   supplies: ServiceSupplyInput[]
 }
 
-function mapService(row: ServiceRow, supplies: SupplyRow[]) {
+type MappedService = Omit<ServiceRow, 'active'> & { active: boolean; supplies: SupplyRow[] }
+
+function mapService(row: ServiceRow, supplies: SupplyRow[]): MappedService {
   return {
     id: row.id,
     code: row.code,
@@ -49,19 +51,21 @@ function mapService(row: ServiceRow, supplies: SupplyRow[]) {
 }
 
 function getSupplies(db: ReturnType<typeof getLocalDb>, serviceId: number): SupplyRow[] {
-  return db.prepare(
-    `SELECT "productId", qty FROM "ServiceSupply" WHERE "serviceId" = ?`
-  ).all(serviceId) as SupplyRow[]
+  return db
+    .prepare(`SELECT "productId", qty FROM "ServiceSupply" WHERE "serviceId" = ?`)
+    .all(serviceId) as SupplyRow[]
 }
 
 export function registerServicesIpc(): void {
   ipcMain.handle('services:get', (_event, id: number) => {
     const db = getLocalDb()
-    const row = db.prepare(
-      `SELECT id, code, name, "durationMin" as durationMin, cost, price,
+    const row = db
+      .prepare(
+        `SELECT id, code, name, "durationMin" as durationMin, cost, price,
               "profitPctBp" as profitPctBp, active, "createdAt" as createdAt
        FROM "Service" WHERE id = ? AND "deletedAt" IS NULL LIMIT 1`
-    ).get(id) as ServiceRow | undefined
+      )
+      .get(id) as ServiceRow | undefined
 
     if (!row) return null
     return mapService(row, getSupplies(db, row.id))
@@ -69,63 +73,75 @@ export function registerServicesIpc(): void {
 
   ipcMain.handle('services:getByCode', (_event, code: string) => {
     const db = getLocalDb()
-    const row = db.prepare(
-      `SELECT id, code, name, "durationMin" as durationMin, cost, price,
+    const row = db
+      .prepare(
+        `SELECT id, code, name, "durationMin" as durationMin, cost, price,
               "profitPctBp" as profitPctBp, active, "createdAt" as createdAt
        FROM "Service" WHERE code = ? AND "deletedAt" IS NULL LIMIT 1`
-    ).get(code) as ServiceRow | undefined
+      )
+      .get(code) as ServiceRow | undefined
 
     if (!row) return null
     return mapService(row, getSupplies(db, row.id))
   })
 
-  ipcMain.handle('services:list', (_event, args: { page: number; pageSize: number; search?: string; active?: boolean }) => {
-    const db = getLocalDb()
-    const page = Math.max(1, args.page ?? 1)
-    const pageSize = Math.max(1, args.pageSize ?? 20)
-    const offset = (page - 1) * pageSize
+  ipcMain.handle(
+    'services:list',
+    (_event, args: { page: number; pageSize: number; search?: string; active?: boolean }) => {
+      const db = getLocalDb()
+      const page = Math.max(1, args.page ?? 1)
+      const pageSize = Math.max(1, args.pageSize ?? 20)
+      const offset = (page - 1) * pageSize
 
-    const conditions: string[] = ['"deletedAt" IS NULL']
-    const params: Record<string, unknown> = { pageSize, offset }
+      const conditions: string[] = ['"deletedAt" IS NULL']
+      const params: Record<string, unknown> = { pageSize, offset }
 
-    if (args.search?.trim()) {
-      conditions.push(`(name LIKE '%' || @search || '%' OR code LIKE '%' || @search || '%')`)
-      params.search = args.search.trim()
-    }
-    if (args.active !== undefined) {
-      conditions.push('active = @active')
-      params.active = args.active ? 1 : 0
-    }
+      if (args.search?.trim()) {
+        conditions.push(`(name LIKE '%' || @search || '%' OR code LIKE '%' || @search || '%')`)
+        params.search = args.search.trim()
+      }
+      if (args.active !== undefined) {
+        conditions.push('active = @active')
+        params.active = args.active ? 1 : 0
+      }
 
-    const where = conditions.join(' AND ')
-    const { count } = db.prepare(
-      `SELECT COUNT(*) as count FROM "Service" WHERE ${where}`
-    ).get(params) as { count: number }
+      const where = conditions.join(' AND ')
+      const { count } = db
+        .prepare(`SELECT COUNT(*) as count FROM "Service" WHERE ${where}`)
+        .get(params) as { count: number }
 
-    const items = db.prepare(
-      `SELECT id, "publicId", code, name, "durationMin" as durationMin, cost, price,
+      const items = db
+        .prepare(
+          `SELECT id, "publicId", code, name, "durationMin" as durationMin, cost, price,
               "profitPctBp" as profitPctBp, active, "createdAt" as createdAt
        FROM "Service" WHERE ${where} ORDER BY id DESC LIMIT @pageSize OFFSET @offset`
-    ).all(params) as ServiceRow[]
+        )
+        .all(params) as ServiceRow[]
 
-    return {
-      items: items.map((s) => ({ ...s, active: Boolean(s.active) })),
-      total: count,
-      page,
-      pageSize
+      return {
+        items: items.map((s) => ({ ...s, active: Boolean(s.active) })),
+        total: count,
+        page,
+        pageSize
+      }
     }
-  })
+  )
 
   ipcMain.handle('services:create', (_event, payload: CreateServicePayload) => {
     void payload
     throw new Error('La BD local de servicios es de solo lectura. Crea servicios en Supabase.')
   })
 
-  ipcMain.handle('services:update', (_event, id: number, payload: Partial<CreateServicePayload>) => {
-    void id
-    void payload
-    throw new Error('La BD local de servicios es de solo lectura. Actualiza servicios en Supabase.')
-  })
+  ipcMain.handle(
+    'services:update',
+    (_event, id: number, payload: Partial<CreateServicePayload>) => {
+      void id
+      void payload
+      throw new Error(
+        'La BD local de servicios es de solo lectura. Actualiza servicios en Supabase.'
+      )
+    }
+  )
 
   ipcMain.handle('services:remove', (_event, id: number) => {
     void id

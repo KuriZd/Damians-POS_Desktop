@@ -29,7 +29,7 @@ function candidateEnvFiles(): string[] {
     path.resolve(process.cwd(), 'pos-runtime.env'),
     path.resolve(process.cwd(), '.env'),
     path.join(execDir, 'pos-runtime.env'),
-    path.join(process.resourcesPath, 'pos-runtime.env'),
+    path.join(process.resourcesPath, 'pos-runtime.env')
   ]
 
   return candidates.filter((value): value is string => Boolean(value))
@@ -42,13 +42,13 @@ function loadRuntimeEnv(): RuntimeEnvResult {
     const fileContent = fs.readFileSync(filePath, 'utf8')
     return {
       values: parseDotenv(fileContent),
-      source: filePath,
+      source: filePath
     }
   }
 
   return {
     values: {},
-    source: 'process.env',
+    source: 'process.env'
   }
 }
 
@@ -57,13 +57,17 @@ function requiredValue(
   fileValues: Record<string, string>
 ): string {
   const value =
-    process.env[name]
-    ?? fileValues[name]
-    ?? (name === 'SUPABASE_URL' ? process.env.VITE_SUPABASE_URL : process.env.VITE_SUPABASE_ANON_KEY)
-    ?? (name === 'SUPABASE_URL' ? fileValues.VITE_SUPABASE_URL : fileValues.VITE_SUPABASE_ANON_KEY)
+    process.env[name] ??
+    fileValues[name] ??
+    (name === 'SUPABASE_URL'
+      ? process.env.VITE_SUPABASE_URL
+      : process.env.VITE_SUPABASE_ANON_KEY) ??
+    (name === 'SUPABASE_URL' ? fileValues.VITE_SUPABASE_URL : fileValues.VITE_SUPABASE_ANON_KEY)
 
   if (!value) {
-    console.warn(`[runtime-config] Falta ${name} — la app funcionará sin sincronización con Supabase`)
+    console.warn(
+      `[runtime-config] Falta ${name} — la app funcionará sin sincronización con Supabase`
+    )
     return ''
   }
 
@@ -81,20 +85,21 @@ export function getRuntimeConfig(): RuntimeConfig {
     supabaseUrl: requiredValue('SUPABASE_URL', envFile.values),
     supabaseAnonKey: requiredValue('SUPABASE_ANON_KEY', envFile.values),
     supabaseServiceRoleKey:
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-      ?? envFile.values.SUPABASE_SERVICE_ROLE_KEY
-      ?? null,
-    source: envFile.source,
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? envFile.values.SUPABASE_SERVICE_ROLE_KEY ?? null,
+    source: envFile.source
   }
 
   return cachedConfig
 }
 
-export function getPublicRuntimeConfig(): Pick<RuntimeConfig, 'supabaseUrl' | 'supabaseAnonKey' | 'source'> {
+export function getPublicRuntimeConfig(): Pick<
+  RuntimeConfig,
+  'supabaseUrl' | 'supabaseAnonKey' | 'source'
+> {
   const config = getRuntimeConfig()
   return {
     supabaseUrl: config.supabaseUrl,
     supabaseAnonKey: config.supabaseAnonKey,
-    source: config.source,
+    source: config.source
   }
 }

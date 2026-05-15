@@ -111,11 +111,18 @@ export function registerUsersIpc(): void {
     async (
       _event,
       id: number,
-      payload: { username?: string; name?: string; role?: AppRole; active?: boolean; password?: string }
+      payload: {
+        username?: string
+        name?: string
+        role?: AppRole
+        active?: boolean
+        password?: string
+      }
     ) => {
       requireAdmin()
       const remotePayload: Record<string, unknown> = {}
-      if (payload.username !== undefined) remotePayload.username = payload.username.trim().toLowerCase()
+      if (payload.username !== undefined)
+        remotePayload.username = payload.username.trim().toLowerCase()
       if (payload.name !== undefined) remotePayload.name = payload.name.trim()
       if (payload.role !== undefined) remotePayload.role = payload.role
       if (payload.active !== undefined) remotePayload.active = payload.active
@@ -136,11 +143,26 @@ export function registerUsersIpc(): void {
       const setClauses: string[] = ['"updatedAt" = CURRENT_TIMESTAMP']
       const params: Record<string, unknown> = { id }
 
-      if (payload.username !== undefined) { setClauses.push('username = @username'); params.username = payload.username.trim().toLowerCase() }
-      if (payload.name !== undefined) { setClauses.push('name = @name'); params.name = payload.name.trim() }
-      if (payload.role !== undefined) { setClauses.push('role = @role'); params.role = payload.role }
-      if (payload.active !== undefined) { setClauses.push('active = @active'); params.active = payload.active ? 1 : 0 }
-      if (passwordHashLocal) { setClauses.push('"passwordHashLocal" = @passwordHashLocal'); params.passwordHashLocal = passwordHashLocal }
+      if (payload.username !== undefined) {
+        setClauses.push('username = @username')
+        params.username = payload.username.trim().toLowerCase()
+      }
+      if (payload.name !== undefined) {
+        setClauses.push('name = @name')
+        params.name = payload.name.trim()
+      }
+      if (payload.role !== undefined) {
+        setClauses.push('role = @role')
+        params.role = payload.role
+      }
+      if (payload.active !== undefined) {
+        setClauses.push('active = @active')
+        params.active = payload.active ? 1 : 0
+      }
+      if (passwordHashLocal) {
+        setClauses.push('"passwordHashLocal" = @passwordHashLocal')
+        params.passwordHashLocal = passwordHashLocal
+      }
 
       db.prepare(`UPDATE "User" SET ${setClauses.join(', ')} WHERE id = @id`).run(params)
 
