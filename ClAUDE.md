@@ -25,17 +25,20 @@ No automated test suite exists yet (no jest/vitest/playwright configured).
 This is a **local-first POS desktop app** (Electron + React 19 + TypeScript + SQLite + Supabase). It runs in three processes:
 
 ### Main Process (`src/main/`)
+
 - Owns the SQLite database (`better-sqlite3`) at `app.getPath('userData')/data/pos-local.db`
 - Registers all IPC handlers in `src/main/ipc/*.ipc.ts` (one file per domain)
 - Holds the privileged Supabase admin client (`src/main/supabase/client.ts`)
 - Window config: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false` (required for better-sqlite3)
 
 ### Preload Process (`src/preload/index.ts`)
+
 - Exposes `window.pos` via `contextBridge` — the **only** communication surface to the renderer
 - All IPC calls flow through `ipcRenderer.invoke()`; the renderer never calls Node directly
 - Type definitions in `src/preload/index.d.ts`
 
 ### Renderer Process (`src/renderer/src/`)
+
 - React 19 SPA with CSS Modules; no global state manager (React hooks + localStorage only)
 - `App.tsx` restores session and routes between `LoginPage` and `AppLayout`
 - `AppLayout` mounts sidebar, top nav, auto-sync (`useSync` hook), and module routing
@@ -62,17 +65,20 @@ To add a new IPC endpoint: add the handler in `src/main/ipc/`, expose it in prel
 ## Database
 
 **Local SQLite** (via better-sqlite3):
+
 - Schema and migration logic in `src/main/db/local-schema.ts`
 - WAL journal mode, foreign keys enabled
 - Migration runs on app start: pre-schema renames → DDL → post-schema backfills
 - All monetary amounts stored as **integer centavos** (not floats)
 
 **Remote Supabase** (catalog only):
+
 - Two clients: `supabase` (anon key, public RPC) and `supabaseAdmin` (service role, user management only)
 - `supabaseAdmin` must **never** be used from the renderer
 - Runtime config loaded via `src/shared/runtime-config.ts` (reads from `POS_RUNTIME_CONFIG_PATH`, `.env`, or `pos-runtime.env`)
 
 **Sync** (pull-only today):
+
 - `useSync` hook calls `window.pos.sync.pullAll()` on mount and every 6 hours
 - `pullAll()` replaces local Category, Product, Service, ServiceSupply from Supabase
 - Push pipeline (`pushPending`) and conflict resolution are scaffolded but not implemented
@@ -90,11 +96,11 @@ To add a new IPC endpoint: add the handler in `src/main/ipc/`, expose it in prel
 
 ## Role-Based Access
 
-| Role | Modules |
-|---|---|
-| `ADMIN` | dashboard, products, inventory, sales, users |
+| Role         | Modules                                      |
+| ------------ | -------------------------------------------- |
+| `ADMIN`      | dashboard, products, inventory, sales, users |
 | `SUPERVISOR` | dashboard, products, inventory, sales, users |
-| `CASHIER` | sales only |
+| `CASHIER`    | sales only                                   |
 
 ---
 
@@ -232,117 +238,117 @@ set
   "lineProfit" = coalesce("lineProfit", "lineTotal" - coalesce("lineCostTotal", 0));
 
 alter table "SaleItem"
-  alter column "itemCodeSnapshot" set not null,
-  alter column "itemNameSnapshot" set not null,
-  alter column "lineSubtotal" set not null,
-  alter column "lineCostTotal" set not null,
-  alter column "lineProfit" set not null;
+alter column "itemCodeSnapshot" set not null,
+alter column "itemNameSnapshot" set not null,
+alter column "lineSubtotal" set not null,
+alter column "lineCostTotal" set not null,
+alter column "lineProfit" set not null;
 
 alter table "SaleItem"
-  drop constraint if exists "SaleItem_item_reference_check";
+drop constraint if exists "SaleItem_item_reference_check";
 
 alter table "SaleItem"
-  add constraint "SaleItem_item_reference_check"
-  check (
-    (
-      "itemType"::text = 'PRODUCT'
-      and "serviceId" is null
-      and "originalProductId" is not null
-    )
-    or
-    (
-      "itemType"::text = 'SERVICE'
-      and "productId" is null
-      and "originalServiceId" is not null
-    )
-  );
+add constraint "SaleItem_item_reference_check"
+check (
+(
+"itemType"::text = 'PRODUCT'
+and "serviceId" is null
+and "originalProductId" is not null
+)
+or
+(
+"itemType"::text = 'SERVICE'
+and "productId" is null
+and "originalServiceId" is not null
+)
+);
 
 alter table "SaleItem"
-  drop constraint if exists "SaleItem_productId_fkey",
-  drop constraint if exists "SaleItem_serviceId_fkey";
+drop constraint if exists "SaleItem_productId_fkey",
+drop constraint if exists "SaleItem_serviceId_fkey";
 
 alter table "SaleItem"
-  add constraint "SaleItem_productId_fkey"
-    foreign key ("productId")
-    references "Product"("id")
-    on update cascade
-    on delete set null,
-  add constraint "SaleItem_serviceId_fkey"
-    foreign key ("serviceId")
-    references "Service"("id")
-    on update cascade
-    on delete set null;
+add constraint "SaleItem_productId_fkey"
+foreign key ("productId")
+references "Product"("id")
+on update cascade
+on delete set null,
+add constraint "SaleItem_serviceId_fkey"
+foreign key ("serviceId")
+references "Service"("id")
+on update cascade
+on delete set null;
 
 alter table "InventoryMovement"
-  alter column "productId" drop not null;
+alter column "productId" drop not null;
 
 alter table "InventoryMovement"
-  add column if not exists "originalProductId" int4,
-  add column if not exists "sourceType" "InventorySourceType" not null default 'MANUAL',
-  add column if not exists "sourceId" int4,
-  add column if not exists "saleId" int4,
-  add column if not exists "saleItemId" int4,
-  add column if not exists "relatedServiceId" int4,
-  add column if not exists "relatedServiceOriginalId" int4,
-  add column if not exists "productPublicIdSnapshot" uuid,
-  add column if not exists "productCodeSnapshot" text,
-  add column if not exists "productNameSnapshot" text,
-  add column if not exists "relatedServiceNameSnapshot" text,
-  add column if not exists "stockBefore" int4,
-  add column if not exists "stockAfter" int4,
-  add column if not exists "unitCostSnapshot" int4,
-  add column if not exists "metaJson" jsonb not null default '{}'::jsonb;
+add column if not exists "originalProductId" int4,
+add column if not exists "sourceType" "InventorySourceType" not null default 'MANUAL',
+add column if not exists "sourceId" int4,
+add column if not exists "saleId" int4,
+add column if not exists "saleItemId" int4,
+add column if not exists "relatedServiceId" int4,
+add column if not exists "relatedServiceOriginalId" int4,
+add column if not exists "productPublicIdSnapshot" uuid,
+add column if not exists "productCodeSnapshot" text,
+add column if not exists "productNameSnapshot" text,
+add column if not exists "relatedServiceNameSnapshot" text,
+add column if not exists "stockBefore" int4,
+add column if not exists "stockAfter" int4,
+add column if not exists "unitCostSnapshot" int4,
+add column if not exists "metaJson" jsonb not null default '{}'::jsonb;
 
 update "InventoryMovement" im
 set
-  "originalProductId" = coalesce(im."originalProductId", im."productId"),
-  "productPublicIdSnapshot" = coalesce(im."productPublicIdSnapshot", p."publicId"),
-  "productCodeSnapshot" = coalesce(im."productCodeSnapshot", p."sku"),
-  "productNameSnapshot" = coalesce(im."productNameSnapshot", p."name"),
-  "unitCostSnapshot" = coalesce(im."unitCostSnapshot", p."cost")
+"originalProductId" = coalesce(im."originalProductId", im."productId"),
+"productPublicIdSnapshot" = coalesce(im."productPublicIdSnapshot", p."publicId"),
+"productCodeSnapshot" = coalesce(im."productCodeSnapshot", p."sku"),
+"productNameSnapshot" = coalesce(im."productNameSnapshot", p."name"),
+"unitCostSnapshot" = coalesce(im."unitCostSnapshot", p."cost")
 from "Product" p
 where im."productId" = p."id";
 
 update "InventoryMovement"
 set
-  "productCodeSnapshot" = coalesce("productCodeSnapshot", 'SIN-CODIGO'),
-  "productNameSnapshot" = coalesce("productNameSnapshot", 'PRODUCTO SIN NOMBRE');
+"productCodeSnapshot" = coalesce("productCodeSnapshot", 'SIN-CODIGO'),
+"productNameSnapshot" = coalesce("productNameSnapshot", 'PRODUCTO SIN NOMBRE');
 
 alter table "InventoryMovement"
-  alter column "productCodeSnapshot" set not null,
-  alter column "productNameSnapshot" set not null;
+alter column "productCodeSnapshot" set not null,
+alter column "productNameSnapshot" set not null;
 
 alter table "InventoryMovement"
-  drop constraint if exists "InventoryMovement_productId_fkey";
+drop constraint if exists "InventoryMovement_productId_fkey";
 
 alter table "InventoryMovement"
-  add constraint "InventoryMovement_productId_fkey"
-    foreign key ("productId")
-    references "Product"("id")
-    on update cascade
-    on delete set null;
+add constraint "InventoryMovement_productId_fkey"
+foreign key ("productId")
+references "Product"("id")
+on update cascade
+on delete set null;
 
 alter table "InventoryMovement"
-  drop constraint if exists "InventoryMovement_saleId_fkey",
-  drop constraint if exists "InventoryMovement_saleItemId_fkey",
-  drop constraint if exists "InventoryMovement_relatedServiceId_fkey";
+drop constraint if exists "InventoryMovement_saleId_fkey",
+drop constraint if exists "InventoryMovement_saleItemId_fkey",
+drop constraint if exists "InventoryMovement_relatedServiceId_fkey";
 
 alter table "InventoryMovement"
-  add constraint "InventoryMovement_saleId_fkey"
-    foreign key ("saleId")
-    references "Sale"("id")
-    on update cascade
-    on delete set null,
-  add constraint "InventoryMovement_saleItemId_fkey"
-    foreign key ("saleItemId")
-    references "SaleItem"("id")
-    on update cascade
-    on delete set null,
-  add constraint "InventoryMovement_relatedServiceId_fkey"
-    foreign key ("relatedServiceId")
-    references "Service"("id")
-    on update cascade
-    on delete set null;
+add constraint "InventoryMovement_saleId_fkey"
+foreign key ("saleId")
+references "Sale"("id")
+on update cascade
+on delete set null,
+add constraint "InventoryMovement_saleItemId_fkey"
+foreign key ("saleItemId")
+references "SaleItem"("id")
+on update cascade
+on delete set null,
+add constraint "InventoryMovement_relatedServiceId_fkey"
+foreign key ("relatedServiceId")
+references "Service"("id")
+on update cascade
+on delete set null;
 
 create index if not exists "SaleItem_createdAt_idx" on "SaleItem" ("createdAt");
 create index if not exists "SaleItem_itemType_idx" on "SaleItem" ("itemType");
@@ -359,29 +365,29 @@ create index if not exists "InventoryMovement_originalProductId_idx" on "Invento
 
 create or replace view "vw_ItemSalesAudit" as
 select
-  si."itemType",
-  si."originalProductId",
-  si."originalServiceId",
-  si."catalogPublicId",
-  si."itemCodeSnapshot",
-  si."itemNameSnapshot",
-  si."itemCategorySnapshot",
-  sum(si."qty")::bigint as "qtySold",
-  sum(si."lineSubtotal")::bigint as "subtotalSold",
-  sum(si."lineTax")::bigint as "taxSold",
-  sum(si."lineTotal")::bigint as "totalSold",
-  sum(si."lineCostTotal")::bigint as "costSold",
-  sum(si."lineProfit")::bigint as "profitSold",
-  min(si."createdAt") as "firstSoldAt",
-  max(si."createdAt") as "lastSoldAt"
+si."itemType",
+si."originalProductId",
+si."originalServiceId",
+si."catalogPublicId",
+si."itemCodeSnapshot",
+si."itemNameSnapshot",
+si."itemCategorySnapshot",
+sum(si."qty")::bigint as "qtySold",
+sum(si."lineSubtotal")::bigint as "subtotalSold",
+sum(si."lineTax")::bigint as "taxSold",
+sum(si."lineTotal")::bigint as "totalSold",
+sum(si."lineCostTotal")::bigint as "costSold",
+sum(si."lineProfit")::bigint as "profitSold",
+min(si."createdAt") as "firstSoldAt",
+max(si."createdAt") as "lastSoldAt"
 from "SaleItem" si
 group by
-  si."itemType",
-  si."originalProductId",
-  si."originalServiceId",
-  si."catalogPublicId",
-  si."itemCodeSnapshot",
-  si."itemNameSnapshot",
-  si."itemCategorySnapshot";
+si."itemType",
+si."originalProductId",
+si."originalServiceId",
+si."catalogPublicId",
+si."itemCodeSnapshot",
+si."itemNameSnapshot",
+si."itemCategorySnapshot";
 
 commit;

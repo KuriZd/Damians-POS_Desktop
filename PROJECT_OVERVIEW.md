@@ -17,18 +17,18 @@ Aplicacion de escritorio construida con Electron + React, con almacenamiento loc
 
 ## Stack
 
-| Capa | Tecnologia |
-| --- | --- |
-| Desktop | Electron 39 |
-| UI | React 19 + TypeScript |
-| Build | Vite 7 + electron-vite |
-| Base local | better-sqlite3 / SQLite |
-| Backend remoto | Supabase |
-| Auth local | bcryptjs |
-| Estilos | CSS Modules |
-| UI helpers | react-icons, qrcode.react |
-| Config | dotenv |
-| Empaquetado | electron-builder |
+| Capa           | Tecnologia                |
+| -------------- | ------------------------- |
+| Desktop        | Electron 39               |
+| UI             | React 19 + TypeScript     |
+| Build          | Vite 7 + electron-vite    |
+| Base local     | better-sqlite3 / SQLite   |
+| Backend remoto | Supabase                  |
+| Auth local     | bcryptjs                  |
+| Estilos        | CSS Modules               |
+| UI helpers     | react-icons, qrcode.react |
+| Config         | dotenv                    |
+| Empaquetado    | electron-builder          |
 
 ---
 
@@ -315,11 +315,11 @@ Notas:
 
 ## Roles y Acceso
 
-| Rol | Secciones habilitadas |
-| --- | --- |
-| `ADMIN` | dashboard, products, inventory, sales, users |
+| Rol          | Secciones habilitadas                        |
+| ------------ | -------------------------------------------- |
+| `ADMIN`      | dashboard, products, inventory, sales, users |
 | `SUPERVISOR` | dashboard, products, inventory, sales, users |
-| `CASHIER` | sales |
+| `CASHIER`    | sales                                        |
 
 ---
 
@@ -346,11 +346,11 @@ Notas:
 
 ## Seguridad Electron
 
-| Configuracion | Valor |
-| --- | --- |
-| `contextIsolation` | `true` |
-| `nodeIntegration` | `false` |
-| `sandbox` | `false` |
-| Preload bridge | `window.pos` via `contextBridge` |
+| Configuracion      | Valor                            |
+| ------------------ | -------------------------------- |
+| `contextIsolation` | `true`                           |
+| `nodeIntegration`  | `false`                          |
+| `sandbox`          | `false`                          |
+| Preload bridge     | `window.pos` via `contextBridge` |
 
 `sandbox: false` se usa por la dependencia nativa `better-sqlite3`.

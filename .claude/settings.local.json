@@ -12,7 +12,14 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts', {}\\), indent=2\\)\\)\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['version']\\)\")",
       "Bash(node -e \"const {loadConfig} = require\\('app-builder-lib/out/util/config/config'\\); loadConfig\\({projectDir: process.cwd\\(\\)}\\).then\\(c => console.log\\(JSON.stringify\\(c, null, 2\\)\\)\\).catch\\(e => console.error\\(e.message\\)\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(grep -E \"^C:\\\\\\\\\\\\\\\\|error\")",
+      "Bash(grep -v \"^--$\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(npm install *)",
+      "Bash(npm test *)",
+      "Bash(grep -E \"^C:.*\\\\.\\(ts|tsx\\)$|^\\\\s+\\\\d+:\\\\d+\\\\s+error\")",
+      "Bash(awk '/^C:.*\\\\.\\(ts|tsx\\)$/{file=$0} /error.*explicit-function-return-type|error.*Compilation Skipped/{print file\": \"$0}')"
     ]
   }
 }
