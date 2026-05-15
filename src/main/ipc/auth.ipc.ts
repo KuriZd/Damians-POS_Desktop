@@ -5,17 +5,9 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { getLocalDb } from '../db/local-db'
 import { supabase, supabaseAdmin } from '../supabase/client'
+import { revalidateUserFromDb, type AuthUser } from './auth.core'
 
 type AppRole = 'ADMIN' | 'CASHIER' | 'SUPERVISOR'
-
-type AuthUser = {
-  id: number
-  name: string
-  username: string
-  role: AppRole
-  active: boolean
-  source: 'local' | 'remote'
-}
 
 type LocalUserRow = {
   id: number
@@ -154,9 +146,11 @@ async function loginAgainstSupabase(
 
     if (!exactRow) continue
 
-    const storedPasswordHash = typeof exactRow.passwordHash === 'string' ? exactRow.passwordHash : null
+    const storedPasswordHash =
+      typeof exactRow.passwordHash === 'string' ? exactRow.passwordHash : null
     const storedPinHash = typeof exactRow.pinHash === 'string' ? exactRow.pinHash : null
-    const isMatch = storedPasswordHash === remotePasswordHash || storedPinHash === remotePasswordHash
+    const isMatch =
+      storedPasswordHash === remotePasswordHash || storedPinHash === remotePasswordHash
 
     attempts.push({
       candidate,
@@ -245,7 +239,9 @@ export function registerAuthIpc(): void {
       )
       .get(normalizedUsername) as LocalUserRow | undefined
 
-    const usernameCandidates = Array.from(new Set([trimmedUsername, normalizedUsername].filter(Boolean)))
+    const usernameCandidates = Array.from(
+      new Set([trimmedUsername, normalizedUsername].filter(Boolean))
+    )
     const { user: remoteUser, attempts } = await loginAgainstSupabase(usernameCandidates, password)
 
     if (!remoteUser) {
@@ -363,18 +359,26 @@ export function registerAuthIpc(): void {
     const db = getLocalDb()
     const trimmed = username.trim()
 
-    const localUser = db.prepare(`
+    const localUser = db
+      .prepare(
+        `
       SELECT id, name, username, role, active, "passwordHashLocal"
       FROM "User"
       WHERE lower(username) = lower(?) AND active = 1 AND "deletedAt" IS NULL
       LIMIT 1
-    `).get(trimmed) as LocalUserRow | undefined
+    `
+      )
+      .get(trimmed) as LocalUserRow | undefined
 
     // Caso 1: hash local disponible → verificación offline sin red
     if (localUser?.passwordHashLocal) {
       const valid = await bcrypt.compare(password, localUser.passwordHashLocal)
       if (!valid) return { ok: false as const, error: 'Contraseña incorrecta.' }
-      if (localUser.role === 'CASHIER') return { ok: false as const, error: 'El usuario no tiene permisos de supervisor o administrador.' }
+      if (localUser.role === 'CASHIER')
+        return {
+          ok: false as const,
+          error: 'El usuario no tiene permisos de supervisor o administrador.'
+        }
       return { ok: true as const, name: localUser.name, role: localUser.role }
     }
 
@@ -382,7 +386,7 @@ export function registerAuthIpc(): void {
     if (localUser) {
       return {
         ok: false as const,
-        error: `"${localUser.username}" necesita iniciar sesión en este dispositivo al menos una vez antes de poder autorizar.`,
+        error: `"${localUser.username}" necesita iniciar sesión en este dispositivo al menos una vez antes de poder autorizar.`
       }
     }
 
@@ -391,39 +395,60 @@ export function registerAuthIpc(): void {
       const candidates = Array.from(new Set([trimmed, trimmed.toLowerCase()]))
       const { user: remoteUser } = await loginAgainstSupabase(candidates, password)
       if (!remoteUser) return { ok: false as const, error: 'Credenciales incorrectas.' }
-      if (remoteUser.role === 'CASHIER') return { ok: false as const, error: 'El usuario no tiene permisos de supervisor o administrador.' }
+      if (remoteUser.role === 'CASHIER')
+        return {
+          ok: false as const,
+          error: 'El usuario no tiene permisos de supervisor o administrador.'
+        }
 
       // Guardar hash local para futuras verificaciones sin red
       const passwordHashLocal = await bcrypt.hash(password, 10)
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO "User" (id, username, name, role, active, "passwordHashLocal", "createdAt", "updatedAt", "lastRemoteLoginAt")
         VALUES (@id, @username, @name, @role, @active, @passwordHashLocal, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           "passwordHashLocal" = excluded."passwordHashLocal",
           "updatedAt" = CURRENT_TIMESTAMP,
           "lastRemoteLoginAt" = CURRENT_TIMESTAMP
-      `).run({
+      `
+      ).run({
         id: remoteUser.id,
         username: remoteUser.username,
         name: remoteUser.name,
         role: remoteUser.role,
         active: remoteUser.active ? 1 : 0,
-        passwordHashLocal,
+        passwordHashLocal
       })
 
       return { ok: true as const, name: remoteUser.name, role: remoteUser.role }
     } catch {
       return {
         ok: false as const,
-        error: 'Usuario no encontrado localmente y sin conexión a internet. El supervisor debe iniciar sesión en este dispositivo al menos una vez.',
+        error:
+          'Usuario no encontrado localmente y sin conexión a internet. El supervisor debe iniciar sesión en este dispositivo al menos una vez.'
       }
     }
   })
 
   ipcMain.handle('auth:me', async () => {
-    if (!currentUser) {
-      currentUser = readSession()
+    const stored = currentUser ?? readSession()
+    if (!stored) return null
+
+    const db = getLocalDb()
+    const validated = revalidateUserFromDb(db, stored)
+
+    if (!validated) {
+      clearSession()
+      currentUser = null
+      return null
     }
+
+    if (validated.role !== stored.role || validated.active !== stored.active) {
+      saveSession(validated)
+    }
+
+    currentUser = validated
     return currentUser
   })
 
