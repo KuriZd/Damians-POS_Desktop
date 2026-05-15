@@ -3,34 +3,63 @@
 type AppRole = 'ADMIN' | 'CASHIER' | 'SUPERVISOR'
 
 type InventoryProduct = {
-  id: number; name: string; sku: string; category: string
-  stock: number; stockMin: number; stockMax: number
-  cost: number; price: number; consumption: number
-  lastMove: string; active: boolean
+  id: number
+  name: string
+  sku: string
+  category: string
+  stock: number
+  stockMin: number
+  stockMax: number
+  cost: number
+  price: number
+  consumption: number
+  lastMove: string
+  active: boolean
   status: 'ok' | 'low' | 'out'
 }
 
 type InventoryStats = {
-  ventas: number; ganancia: number; costo: number; margen: number
-  tickets: number; unidades: number; bajos: number; movimientos: number
-  changes: { ventas: number; ganancia: number; costo: number; margen: number; tickets: number; unidades: number; bajos: number; movimientos: number }
+  ventas: number
+  ganancia: number
+  costo: number
+  margen: number
+  tickets: number
+  unidades: number
+  bajos: number
+  movimientos: number
+  changes: {
+    ventas: number
+    ganancia: number
+    costo: number
+    margen: number
+    tickets: number
+    unidades: number
+    bajos: number
+    movimientos: number
+  }
 }
 
 type InventoryChartPoint = { label: string; sales: number; profit: number }
 
 type InventoryMovement = {
-  id: string; date: string; time: string; product: string
+  id: string
+  date: string
+  time: string
+  product: string
   type: 'entrada' | 'venta' | 'ajuste' | 'merma' | 'devolucion'
-  qty: number; stockBefore: number | null; stockAfter: number | null
-  user: string; note: string
+  qty: number
+  stockBefore: number | null
+  stockAfter: number | null
+  user: string
+  note: string
 }
 
 type DashboardStats = {
-  today:       { total: number; tickets: number; units: number }
+  today: { total: number; tickets: number; units: number }
   todayProfit: number
-  week:        { total: number; tickets: number }
-  lowStock:    number
-  heatmap:     Array<{ date: string; total: number; tickets: number }>
+  week: { total: number; tickets: number }
+  lowStock: number
+  heatmap: Array<{ date: string; total: number; tickets: number }>
 }
 
 type RecentSale = {
@@ -89,9 +118,20 @@ type DiagnosticResult = {
   unsyncedSales: { id: number; folio: string; total: number; createdAt: string }[]
 }
 
+type StockErrorItem = {
+  sku: string
+  name: string
+  requested: number
+  available: number
+}
+
 type InventoryMovementPayload = {
-  productId: number; type: 'entrada' | 'ajuste' | 'merma' | 'devolucion'
-  qty: number; realQty?: number; userId?: number; note?: string
+  productId: number
+  type: 'entrada' | 'ajuste' | 'merma' | 'devolucion'
+  qty: number
+  realQty?: number
+  userId?: number
+  note?: string
 }
 
 interface SyncConflict {
@@ -137,36 +177,45 @@ interface Window {
       login: (username: string, password: string) => Promise<AuthUser | null>
       me: () => Promise<AuthUser | null>
       logout: () => Promise<{ ok: boolean }>
-      verifySupervisor: (username: string, password: string) => Promise<
-        | { ok: true; name: string; role: string }
-        | { ok: false; error: string }
-      >
+      verifySupervisor: (
+        username: string,
+        password: string
+      ) => Promise<{ ok: true; name: string; role: string } | { ok: false; error: string }>
     }
     products: {
       findByCode: (code: string) => Promise<ProductLookup | null>
-      list: (args: import('./types/pos').ProductsListArgs) => Promise<import('./types/pos').ProductsListResult>
+      list: (
+        args: import('./types/pos').ProductsListArgs
+      ) => Promise<import('./types/pos').ProductsListResult>
       get: (id: number) => Promise<import('./types/pos').ProductDetails>
       getBySku?: (sku: string) => Promise<import('./types/pos').ProductDetails | null>
     }
     services: {
-      list: (args: import('./types/pos').ServicesListArgs) => Promise<import('./types/pos').ServicesListResult>
+      list: (
+        args: import('./types/pos').ServicesListArgs
+      ) => Promise<import('./types/pos').ServicesListResult>
       get: (id: number) => Promise<import('./types/pos').ServiceDetails>
       getByCode?: (code: string) => Promise<import('./types/pos').ServiceDetails | null>
     }
     users: {
-    list: () => Promise<import('./types/pos').UserListItem[]>
-    create: (payload: import('./types/pos').CreateUserPayload) => Promise<{ ok: boolean }>
-    update: (id: number, payload: import('./types/pos').UpdateUserPayload) => Promise<{ ok: boolean }>
-    delete: (id: number) => Promise<{ ok: boolean }>
-  }
-  inventory: {
-    products: () => Promise<InventoryProduct[]>
-    stats: (period: 'today' | 'week' | 'month') => Promise<InventoryStats>
-    chart: () => Promise<InventoryChartPoint[]>
-    movements: (typeFilter?: string) => Promise<InventoryMovement[]>
-    registerMovement: (payload: InventoryMovementPayload) => Promise<{ ok: boolean; stockBefore: number; stockAfter: number }>
-  }
-  sales: {
+      list: () => Promise<import('./types/pos').UserListItem[]>
+      create: (payload: import('./types/pos').CreateUserPayload) => Promise<{ ok: boolean }>
+      update: (
+        id: number,
+        payload: import('./types/pos').UpdateUserPayload
+      ) => Promise<{ ok: boolean }>
+      delete: (id: number) => Promise<{ ok: boolean }>
+    }
+    inventory: {
+      products: () => Promise<InventoryProduct[]>
+      stats: (period: 'today' | 'week' | 'month') => Promise<InventoryStats>
+      chart: () => Promise<InventoryChartPoint[]>
+      movements: (typeFilter?: string) => Promise<InventoryMovement[]>
+      registerMovement: (
+        payload: InventoryMovementPayload
+      ) => Promise<{ ok: boolean; stockBefore: number; stockAfter: number }>
+    }
+    sales: {
       recent: (limit?: number) => Promise<RecentSale[]>
       create: (payload: {
         cashierId: number
@@ -182,17 +231,21 @@ interface Window {
         discount?: number
         subtotal?: number
         total?: number
-        payment: { method: string; amount: number }
-      }) => Promise<{ ok: true; folio: string; salePublicId: string }>
+        payments: Array<{ method: string; amount: number }>
+      }) => Promise<
+        | { ok: true; folio: string; salePublicId: string }
+        | { ok: false; error: string; items?: StockErrorItem[] }
+      >
       corte: (cashierId: number) => Promise<CorteData>
-      confirmCorte: (cashierId: number, countedCash?: number) => Promise<
-        | { ok: true; sessionId: number }
-        | { ok: false; error: string }
-      >
-      cashMovement: (payload: { type: 'IN' | 'OUT'; amount: number; reason?: string }) => Promise<
-        | { ok: true; id: number }
-        | { ok: false; error: string }
-      >
+      confirmCorte: (
+        cashierId: number,
+        countedCash?: number
+      ) => Promise<{ ok: true; sessionId: number } | { ok: false; error: string }>
+      cashMovement: (payload: {
+        type: 'IN' | 'OUT'
+        amount: number
+        reason?: string
+      }) => Promise<{ ok: true; id: number } | { ok: false; error: string }>
     }
     sync: {
       pullProducts: () => Promise<{ ok: boolean; count: number }>

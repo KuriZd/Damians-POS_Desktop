@@ -1,29 +1,29 @@
 /* src/renderer/src/components/layout/AppLayout.module.css */
 
 .layout {
-    width: 100%;
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    background: #f0f2f7;
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  background: #f0f2f7;
 }
 
 .mainArea {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .content {
-    padding: 0;
-    box-sizing: border-box;
-    flex: 1;
+  padding: 0;
+  box-sizing: border-box;
+  flex: 1;
 }
 
 /* ✅ .placeholderCard, .placeholderTitle, .placeholderText eliminados — no los usa ningún componente */
 
 @media (max-width: 900px) {
-    .content {
-        padding: 16px;
-    }
+  .content {
+    padding: 16px;
+  }
 }

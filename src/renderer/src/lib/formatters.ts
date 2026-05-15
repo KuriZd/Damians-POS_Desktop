@@ -40,6 +40,6 @@ export function formatMXN(cents: number, opts?: { decimals?: number }): string {
     style: 'currency',
     currency: 'MXN',
     minimumFractionDigits: d,
-    maximumFractionDigits: d,
+    maximumFractionDigits: d
   })
 }

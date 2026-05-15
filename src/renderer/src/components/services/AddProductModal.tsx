@@ -896,11 +896,14 @@ export default function AddProductModal({
     void (async () => {
       try {
         const localProduct = await tryLocalGet(effectiveProductId)
-        const supabaseProduct = localProduct ? null : await fetchSupabaseProductById(effectiveProductId)
+        const supabaseProduct = localProduct
+          ? null
+          : await fetchSupabaseProductById(effectiveProductId)
         const product = localProduct ?? supabaseProduct
 
         if (cancelled) return
-        if (!product) throw new Error('No se pudo cargar el producto desde local ni desde Supabase.')
+        if (!product)
+          throw new Error('No se pudo cargar el producto desde local ni desde Supabase.')
 
         setLoadedFrom(localProduct ? 'local' : 'supabase')
         setForm({
@@ -1261,7 +1264,8 @@ export default function AddProductModal({
       if (sell !== null && sell < 0) throw new Error('El precio de venta no puede ser negativo')
 
       const okSku = await validateSkuUniqueness(code)
-      if (!okSku && !isEditMode) throw new Error('El código del producto ya existe. Usa otro código.')
+      if (!okSku && !isEditMode)
+        throw new Error('El código del producto ya existe. Usa otro código.')
 
       const createPayload = await buildCreateProductPayload(form, imageFile)
       const updatePayload = await buildUpdateProductPayload(form, imageFile, imageIntent)
@@ -1282,7 +1286,11 @@ export default function AddProductModal({
 
   const modalTitle = isEditMode ? 'Editar Producto' : 'Agregar Producto'
   const sourceLabel =
-    loadedFrom === 'local' ? 'Fuente: BD local' : loadedFrom === 'supabase' ? 'Fuente: Supabase' : null
+    loadedFrom === 'local'
+      ? 'Fuente: BD local'
+      : loadedFrom === 'supabase'
+        ? 'Fuente: Supabase'
+        : null
 
   return createPortal(
     <>
@@ -1309,7 +1317,10 @@ export default function AddProductModal({
                 newCategoryName={newCategoryName}
                 savingCategory={savingCategory}
                 onOpenAddCategory={() => setAddingCategory(true)}
-                onCancelAddCategory={() => { setAddingCategory(false); setNewCategoryName('') }}
+                onCancelAddCategory={() => {
+                  setAddingCategory(false)
+                  setNewCategoryName('')
+                }}
                 onNewCategoryNameChange={setNewCategoryName}
                 onSaveNewCategory={() => void handleSaveNewCategory()}
               />

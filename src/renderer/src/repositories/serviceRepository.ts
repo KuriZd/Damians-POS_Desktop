@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabaseClient'
 
 export type ServiceSupplyInput = {
@@ -172,7 +171,10 @@ function buildServiceDetails(
   }
 }
 
-function buildServiceRowCamel(payload: Partial<CreateServicePayload>, forInsert = false): UnknownRow {
+function buildServiceRowCamel(
+  payload: Partial<CreateServicePayload>,
+  forInsert = false
+): UnknownRow {
   const row: UnknownRow = {}
 
   if (typeof payload.code === 'string') row.code = payload.code.trim()
@@ -256,7 +258,7 @@ async function getSupabaseServiceSupplies(serviceId: number): Promise<ServiceSup
         .select('*')
         .eq('serviceId', serviceId)
       assertSupabaseOk(error, 'No se pudieron consultar los insumos del servicio en Supabase.')
-      return mapSupplies(((data ?? []) as unknown[]))
+      return mapSupplies((data ?? []) as unknown[])
     },
     async () => {
       const { data, error } = await supabase
@@ -264,7 +266,7 @@ async function getSupabaseServiceSupplies(serviceId: number): Promise<ServiceSup
         .select('*')
         .eq('serviceId', serviceId)
       assertSupabaseOk(error, 'No se pudieron consultar los insumos del servicio en Supabase.')
-      return mapSupplies(((data ?? []) as unknown[]))
+      return mapSupplies((data ?? []) as unknown[])
     }
   ]
 
@@ -290,7 +292,10 @@ async function replaceSupabaseServiceSupplies(
 ): Promise<void> {
   const safeSupplies = supplies ?? []
 
-  const { error: deleteError } = await supabase.from('ServiceSupply').delete().eq('serviceId', serviceId)
+  const { error: deleteError } = await supabase
+    .from('ServiceSupply')
+    .delete()
+    .eq('serviceId', serviceId)
   assertSupabaseOk(deleteError, 'No se pudieron actualizar los insumos del servicio en Supabase.')
 
   if (safeSupplies.length === 0) return
@@ -364,8 +369,9 @@ async function listSupabaseServices(args: ServicesListArgs): Promise<ServicesLis
   const { data, error, count } = await query.range(from, to).order('id', { ascending: false })
   assertSupabaseOk(error, 'No se pudo listar los servicios desde Supabase.')
 
-  const items = (((data ?? []) as unknown[]).map(mapSupabaseService).filter(Boolean) as SupabaseServiceRecord[])
-    .map((item) => buildServiceDetails(item, undefined, 'supabase'))
+  const items = (
+    ((data ?? []) as unknown[]).map(mapSupabaseService).filter(Boolean) as SupabaseServiceRecord[]
+  ).map((item) => buildServiceDetails(item, undefined, 'supabase'))
 
   return {
     items,
@@ -421,7 +427,9 @@ export const serviceRepository = {
   async create(payload: CreateServicePayload): Promise<{ id: number }> {
     try {
       const supabaseId = await insertSupabaseService(payload)
-      await getSyncBridge()?.pullAll?.().catch(() => undefined)
+      await getSyncBridge()
+        ?.pullAll?.()
+        .catch(() => undefined)
       return { id: supabaseId }
     } catch (error) {
       console.warn('No se pudo sincronizar el servicio en Supabase.', error)
@@ -435,7 +443,9 @@ export const serviceRepository = {
 
     try {
       await updateSupabaseServiceByLocator(id, payload, existingCode)
-      await getSyncBridge()?.pullAll?.().catch(() => undefined)
+      await getSyncBridge()
+        ?.pullAll?.()
+        .catch(() => undefined)
     } catch (error) {
       console.warn('No se pudo sincronizar la actualización del servicio en Supabase.', error)
       if (error instanceof Error) throw error

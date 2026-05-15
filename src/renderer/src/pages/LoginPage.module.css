@@ -45,13 +45,15 @@
   width: 4px;
   height: 100%;
   border-radius: 0 12px 12px 0;
-  background: linear-gradient(to bottom,
-      #62d97d 0%,
-      #62d97d 33%,
-      #5b79ff 33%,
-      #5b79ff 66%,
-      #ff6f61 66%,
-      #ff6f61 100%);
+  background: linear-gradient(
+    to bottom,
+    #62d97d 0%,
+    #62d97d 33%,
+    #5b79ff 33%,
+    #5b79ff 66%,
+    #ff6f61 66%,
+    #ff6f61 100%
+  );
 }
 
 /* 

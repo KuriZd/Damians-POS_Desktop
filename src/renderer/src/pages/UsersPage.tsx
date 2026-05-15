@@ -64,11 +64,16 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
     setError(null)
     try {
       const rows = await listUsers()
-      const filtered = user.role === 'ADMIN' ? rows : rows.filter((item) => canManageTarget(user.role, item.role))
-      console.info(`[users] Usuarios cargados: ${rows.length}. Visibles para ${user.role}: ${filtered.length}`)
+      const filtered =
+        user.role === 'ADMIN' ? rows : rows.filter((item) => canManageTarget(user.role, item.role))
+      console.info(
+        `[users] Usuarios cargados: ${rows.length}. Visibles para ${user.role}: ${filtered.length}`
+      )
       setItems(filtered)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los usuarios.')
+      setError(
+        loadError instanceof Error ? loadError.message : 'No se pudieron cargar los usuarios.'
+      )
     } finally {
       setLoading(false)
     }
@@ -125,7 +130,9 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
       setError('No tienes permiso para eliminar este usuario.')
       return
     }
-    const confirmed = window.confirm(`¿Eliminar al usuario "${target.name}" (${target.username})? Esta acción no se puede deshacer.`)
+    const confirmed = window.confirm(
+      `¿Eliminar al usuario "${target.name}" (${target.username})? Esta acción no se puede deshacer.`
+    )
     if (!confirmed) return
 
     try {
@@ -284,7 +291,11 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
                     className={styles.deleteButton}
                     type="button"
                     onClick={() => void handleDelete(item)}
-                    disabled={!canManageTarget(user.role, item.role) || item.id === user.id || deletingId === item.id}
+                    disabled={
+                      !canManageTarget(user.role, item.role) ||
+                      item.id === user.id ||
+                      deletingId === item.id
+                    }
                   >
                     {deletingId === item.id ? '...' : 'Eliminar'}
                   </button>
@@ -310,7 +321,9 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
                 <span>Usuario</span>
                 <input
                   value={form.username}
-                  onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, username: event.target.value }))
+                  }
                   disabled={saving}
                 />
               </label>
@@ -328,7 +341,9 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
                 <span>Rol</span>
                 <select
                   value={form.role}
-                  onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value as AppRole }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, role: event.target.value as AppRole }))
+                  }
                   disabled={saving}
                 >
                   {manageableRoles.map((role) => (
@@ -344,7 +359,9 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
                 <input
                   type="password"
                   value={form.password}
-                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, password: event.target.value }))
+                  }
                   disabled={saving}
                 />
               </label>
@@ -353,7 +370,9 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
                 <input
                   type="checkbox"
                   checked={form.active}
-                  onChange={(event) => setForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, active: event.target.checked }))
+                  }
                   disabled={saving}
                 />
                 <span>Usuario activo</span>
@@ -362,7 +381,12 @@ export default function UsersPage({ user }: UsersPageProps): JSX.Element {
               {error ? <div className={styles.errorBanner}>{error}</div> : null}
 
               <div className={styles.modalActions}>
-                <button className={styles.secondaryButton} type="button" onClick={closeModal} disabled={saving}>
+                <button
+                  className={styles.secondaryButton}
+                  type="button"
+                  onClick={closeModal}
+                  disabled={saving}
+                >
                   Cancelar
                 </button>
                 <button className={styles.primaryButton} type="submit" disabled={saving}>

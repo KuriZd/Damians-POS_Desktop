@@ -9,7 +9,10 @@ import { FiClock, FiType } from 'react-icons/fi'
 import AddProductModal from '../components/services/AddProductModal'
 import AddServiceModal from '../components/services/AddServicesModal'
 import { serviceRepository, type ServiceDetails } from '../repositories/serviceRepository'
-import FiltersDropdown, { type FilterKey, type FilterOption } from '../components/FiltersDropdown/FiltersDropdown'
+import FiltersDropdown, {
+  type FilterKey,
+  type FilterOption
+} from '../components/FiltersDropdown/FiltersDropdown'
 import { supabase } from '../lib/supabaseClient'
 import { formatMXN } from '../lib/formatters'
 
@@ -159,7 +162,11 @@ function normalizeServiceFromSupabase(row: Record<string, unknown>): ServiceList
   }
 }
 
-async function fetchProductsFromLocal(page: number, pageSize: number, search: string): Promise<ProductsListResult> {
+async function fetchProductsFromLocal(
+  page: number,
+  pageSize: number,
+  search: string
+): Promise<ProductsListResult> {
   const productsApi = getLocalProductsApi()
 
   if (!productsApi?.list) {
@@ -188,7 +195,11 @@ async function fetchProductsFromLocal(page: number, pageSize: number, search: st
   }
 }
 
-async function fetchProductsFromSupabase(page: number, pageSize: number, search: string): Promise<ProductsListResult> {
+async function fetchProductsFromSupabase(
+  page: number,
+  pageSize: number,
+  search: string
+): Promise<ProductsListResult> {
   let query = supabase
     .from('Product')
     .select('*', { count: 'exact' })
@@ -218,7 +229,11 @@ async function fetchProductsFromSupabase(page: number, pageSize: number, search:
   }
 }
 
-async function fetchServicesFromSupabase(page: number, pageSize: number, search: string): Promise<ServicesListResult> {
+async function fetchServicesFromSupabase(
+  page: number,
+  pageSize: number,
+  search: string
+): Promise<ServicesListResult> {
   let query = supabase
     .from('Service')
     .select('*', { count: 'exact' })
@@ -312,7 +327,11 @@ export default function ProductsView(): JSX.Element {
     }
   }, [mode, filterKey])
 
-  async function fetchProductsList(nextPage = page, nextPageSize = pageSize, nextSearch = search): Promise<void> {
+  async function fetchProductsList(
+    nextPage = page,
+    nextPageSize = pageSize,
+    nextSearch = search
+  ): Promise<void> {
     setLoadingProducts(true)
     setLoadError(null)
 
@@ -332,15 +351,27 @@ export default function ProductsView(): JSX.Element {
         setProductsData(remoteResult)
       } catch (remoteError) {
         console.error('No se pudieron cargar los productos.', { localError, remoteError })
-        setLoadError('No se pudieron cargar los productos. Verifica tu conexión e intenta de nuevo.')
-        setProductsData({ items: [], total: 0, page: nextPage, pageSize: nextPageSize, source: 'local' })
+        setLoadError(
+          'No se pudieron cargar los productos. Verifica tu conexión e intenta de nuevo.'
+        )
+        setProductsData({
+          items: [],
+          total: 0,
+          page: nextPage,
+          pageSize: nextPageSize,
+          source: 'local'
+        })
       }
     } finally {
       setLoadingProducts(false)
     }
   }
 
-  async function fetchServicesList(nextPage = page, nextPageSize = pageSize, nextSearch = search): Promise<void> {
+  async function fetchServicesList(
+    nextPage = page,
+    nextPageSize = pageSize,
+    nextSearch = search
+  ): Promise<void> {
     setLoadingServices(true)
     setLoadError(null)
 
@@ -354,7 +385,13 @@ export default function ProductsView(): JSX.Element {
       const items = localResult.items.map(normalizeServiceFromLocal)
 
       if (localResult.total > 0 || !supabase) {
-        setServicesData({ items, total: localResult.total, page: localResult.page, pageSize: localResult.pageSize, source: 'local' })
+        setServicesData({
+          items,
+          total: localResult.total,
+          page: localResult.page,
+          pageSize: localResult.pageSize,
+          source: 'local'
+        })
         return
       }
 
@@ -366,8 +403,16 @@ export default function ProductsView(): JSX.Element {
         setServicesData(remoteResult)
       } catch (remoteError) {
         console.error('No se pudieron cargar los servicios.', { localError, remoteError })
-        setLoadError('No se pudieron cargar los servicios. Verifica tu conexión e intenta de nuevo.')
-        setServicesData({ items: [], total: 0, page: nextPage, pageSize: nextPageSize, source: 'local' })
+        setLoadError(
+          'No se pudieron cargar los servicios. Verifica tu conexión e intenta de nuevo.'
+        )
+        setServicesData({
+          items: [],
+          total: 0,
+          page: nextPage,
+          pageSize: nextPageSize,
+          source: 'local'
+        })
       }
     } finally {
       setLoadingServices(false)
@@ -414,11 +459,11 @@ export default function ProductsView(): JSX.Element {
         await productsApi.remove(id)
       }
 
-      if (true) {
-        const { error } = await supabase.from('Product').update({ active: false }).eq('id', id)
-        if (error) throw new Error(error.message)
-        await getSyncBridge()?.pullAll?.().catch(() => undefined)
-      }
+      const { error } = await supabase.from('Product').update({ active: false }).eq('id', id)
+      if (error) throw new Error(error.message)
+      await getSyncBridge()
+        ?.pullAll?.()
+        .catch(() => undefined)
 
       const fallbackPage = page > 1 && productsData.items.length === 1 ? page - 1 : page
       setPage(fallbackPage)
@@ -437,11 +482,11 @@ export default function ProductsView(): JSX.Element {
         await servicesApi.remove(id)
       }
 
-      if (true) {
-        const { error } = await supabase.from('Service').update({ active: false }).eq('id', id)
-        if (error) throw new Error(error.message)
-        await getSyncBridge()?.pullAll?.().catch(() => undefined)
-      }
+      const { error } = await supabase.from('Service').update({ active: false }).eq('id', id)
+      if (error) throw new Error(error.message)
+      await getSyncBridge()
+        ?.pullAll?.()
+        .catch(() => undefined)
 
       const fallbackPage = page > 1 && servicesData.items.length === 1 ? page - 1 : page
       setPage(fallbackPage)
@@ -563,8 +608,14 @@ export default function ProductsView(): JSX.Element {
 
   useBarcodeScanner(handlePageScan)
 
-  const visibleProductItems = useMemo(() => sortProducts(productsData.items, filterKey), [productsData.items, filterKey])
-  const visibleServiceItems = useMemo(() => sortServices(servicesData.items, filterKey), [servicesData.items, filterKey])
+  const visibleProductItems = useMemo(
+    () => sortProducts(productsData.items, filterKey),
+    [productsData.items, filterKey]
+  )
+  const visibleServiceItems = useMemo(
+    () => sortServices(servicesData.items, filterKey),
+    [servicesData.items, filterKey]
+  )
 
   const startIndex = currentData.total === 0 ? 0 : (currentData.page - 1) * currentData.pageSize + 1
   const endIndex = Math.min(currentData.total, currentData.page * currentData.pageSize)
@@ -612,21 +663,33 @@ export default function ProductsView(): JSX.Element {
 
           <div className={styles.actions}>
             <div className={styles.addMenuWrap} ref={addMenuRef}>
-              <button className={`${styles.btn} ${styles.addBtn}`} type="button" onClick={toggleAddMenu}>
+              <button
+                className={`${styles.btn} ${styles.addBtn}`}
+                type="button"
+                onClick={toggleAddMenu}
+              >
                 <span>Agregar</span>
                 <img className={styles.addIcon} src={btnAddIcon} alt="" />
               </button>
 
               {addMenuOpen && (
                 <div className={styles.dropdown} role="menu" aria-label="Agregar">
-                  <button className={styles.dropdownItem} type="button" onClick={() => handleAddOption('product')}>
+                  <button
+                    className={styles.dropdownItem}
+                    type="button"
+                    onClick={() => handleAddOption('product')}
+                  >
                     <span className={styles.dropdownIcon}>
                       <AiOutlineProduct />
                     </span>
                     <span>Producto</span>
                   </button>
 
-                  <button className={styles.dropdownItem} type="button" onClick={() => handleAddOption('service')}>
+                  <button
+                    className={styles.dropdownItem}
+                    type="button"
+                    onClick={() => handleAddOption('service')}
+                  >
                     <span className={styles.dropdownIcon}>
                       <FaHandshake />
                     </span>
@@ -666,7 +729,9 @@ export default function ProductsView(): JSX.Element {
         {loadError && (
           <div className={styles.errorBanner}>
             ⚠ {loadError}
-            <button className={styles.errorRetry} onClick={() => fetchCurrentList()}>Reintentar</button>
+            <button className={styles.errorRetry} onClick={() => fetchCurrentList()}>
+              Reintentar
+            </button>
           </div>
         )}
 
@@ -783,7 +848,12 @@ export default function ProductsView(): JSX.Element {
 
           <span className={styles.muted}>Origen: {dataSourceLabel}</span>
 
-          <button className={styles.pageBtn} type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          <button
+            className={styles.pageBtn}
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             ←
           </button>
 
@@ -793,7 +863,12 @@ export default function ProductsView(): JSX.Element {
             </span>
           </div>
 
-          <button className={styles.pageBtn} type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          <button
+            className={styles.pageBtn}
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
             →
           </button>
         </div>
@@ -808,7 +883,11 @@ export default function ProductsView(): JSX.Element {
         options={mode === 'services' ? serviceFilterOptions : undefined}
       />
 
-      <AddProductModal open={productModalOpen} productId={editingProductId} onClose={closeProductModal} />
+      <AddProductModal
+        open={productModalOpen}
+        productId={editingProductId}
+        onClose={closeProductModal}
+      />
 
       <AddServiceModal
         open={serviceModalOpen}

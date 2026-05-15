@@ -1,89 +1,89 @@
 .layer {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
 }
 
 .menu {
-    position: absolute;
+  position: absolute;
 
-    background: #fff;
-    border-radius: 14px;
-    padding: 8px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 8px;
 
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
-    border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 
-    display: grid;
-    gap: 4px;
+  display: grid;
+  gap: 4px;
 }
 
 .item {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 
-    border: 0;
-    background: transparent;
-    cursor: pointer;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 
-    padding: 10px 10px;
-    border-radius: 12px;
+  padding: 10px 10px;
+  border-radius: 12px;
 
-    font-size: 16px;
-    font-weight: 600;
-    color: #0b0b0b;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0b0b0b;
 
-    text-align: left;
+  text-align: left;
 
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .item:hover {
-    background: rgba(59, 130, 246, 0.08);
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .itemActive {
-    background: rgba(59, 130, 246, 0.12);
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .icon {
-    width: 24px;
-    height: 24px;
-    display: grid;
-    place-items: center;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
 
-    color: #0b0b0b;
-    opacity: 0.9;
+  color: #0b0b0b;
+  opacity: 0.9;
 }
 
 .label {
-    line-height: 1.1;
+  line-height: 1.1;
 }
 
 /* Móvil: bottom-sheet compacto */
 @media (max-width: 260px) {
-    .menu {
-        position: fixed !important;
-        left: 10px !important;
-        right: 10px !important;
-        bottom: 10px !important;
-        top: auto !important;
-        width: auto !important;
+  .menu {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 10px !important;
+    top: auto !important;
+    width: auto !important;
 
-        padding: 10px;
-        border-radius: 16px;
-    }
+    padding: 10px;
+    border-radius: 16px;
+  }
 
-    .item {
-        font-size: 16px;
-        padding: 12px 10px;
-    }
+  .item {
+    font-size: 16px;
+    padding: 12px 10px;
+  }
 
-    .icon {
-        width: 22px;
-        height: 22px;
-    }
+  .icon {
+    width: 22px;
+    height: 22px;
+  }
 }

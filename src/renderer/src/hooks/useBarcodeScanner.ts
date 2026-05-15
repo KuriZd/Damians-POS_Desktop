@@ -1,5 +1,5 @@
 // src/renderer/src/hooks/useBarcodeScanner.ts
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -11,7 +11,10 @@ export function useBarcodeScanner(onScan: (code: string) => void): void {
   const bufferRef = useRef<string>('')
   const timerRef = useRef<number | null>(null)
   const onScanRef = useRef(onScan)
-  onScanRef.current = onScan
+
+  useLayoutEffect(() => {
+    onScanRef.current = onScan
+  })
 
   useEffect((): (() => void) => {
     const onKeyDown = (event: KeyboardEvent): void => {

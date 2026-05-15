@@ -199,13 +199,17 @@ export const productRepository = {
       throw new Error('No se pudo guardar el producto en Supabase.')
     }
 
-    await getSyncBridge()?.pullAll?.().catch(() => undefined)
+    await getSyncBridge()
+      ?.pullAll?.()
+      .catch(() => undefined)
     return remoteResult
   },
 
   async update(id: number, payload: Partial<CreateProductPayload>): Promise<void> {
     await updateInSupabase(id, payload)
-    await getSyncBridge()?.pullAll?.().catch(() => undefined)
+    await getSyncBridge()
+      ?.pullAll?.()
+      .catch(() => undefined)
   },
 
   async get(id: number): Promise<ProductDetails> {

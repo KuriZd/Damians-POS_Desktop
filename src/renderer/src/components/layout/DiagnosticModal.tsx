@@ -7,7 +7,7 @@ type DiagnosticResult = {
   supabaseUrl: string
   checkedAt: string
   connection: {
-    anon:  ConnCheck
+    anon: ConnCheck
     admin: ConnCheck
   }
   local: {
@@ -38,7 +38,15 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }): ReactElemen
   )
 }
 
-function Row({ label, value, sub }: { label: string; value: ReactElement | string; sub?: string }): ReactElement {
+function Row({
+  label,
+  value,
+  sub
+}: {
+  label: string
+  value: ReactElement | string
+  sub?: string
+}): ReactElement {
   return (
     <div className={styles.row}>
       <span className={styles.rowLabel}>{label}</span>
@@ -61,8 +69,12 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
   const [pullResult, setPullResult] = useState<string | null>(null)
 
   useEffect(() => {
-    void window.pos.sync.diagnose()
-      .then((r: DiagnosticResult) => { setResult(r); setLoading(false) })
+    void window.pos.sync
+      .diagnose()
+      .then((r: DiagnosticResult) => {
+        setResult(r)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
 
@@ -70,13 +82,22 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
     setPushing(true)
     setPushResult(null)
     try {
-      const r = await window.pos.sync.pushPending() as { ok: boolean; pushed: number; failed: number }
+      const r = (await window.pos.sync.pushPending()) as {
+        ok: boolean
+        pushed: number
+        failed: number
+      }
       setPushResult({ ok: r.failed === 0, pushed: r.pushed, failed: r.failed })
       // Re-run diagnose to refresh counts
-      const fresh = await window.pos.sync.diagnose() as DiagnosticResult
+      const fresh = (await window.pos.sync.diagnose()) as DiagnosticResult
       setResult(fresh)
     } catch (e) {
-      setPushResult({ ok: false, pushed: 0, failed: 0, error: e instanceof Error ? e.message : 'Error desconocido' })
+      setPushResult({
+        ok: false,
+        pushed: 0,
+        failed: 0,
+        error: e instanceof Error ? e.message : 'Error desconocido'
+      })
     } finally {
       setPushing(false)
     }
@@ -86,8 +107,10 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
     setPulling(true)
     setPullResult(null)
     try {
-      const r = await window.pos.sync.pullAll() as { ok: boolean; counts: Record<string, number> }
-      const parts = Object.entries(r.counts ?? {}).map(([k, v]) => `${k}: ${v}`).join(', ')
+      const r = (await window.pos.sync.pullAll()) as { ok: boolean; counts: Record<string, number> }
+      const parts = Object.entries(r.counts ?? {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ')
       setPullResult(`Catálogo actualizado — ${parts}`)
     } catch (e) {
       setPullResult(`Error: ${e instanceof Error ? e.message : 'desconocido'}`)
@@ -98,10 +121,12 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.box} onClick={e => e.stopPropagation()}>
+      <div className={styles.box} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <span className={styles.title}>Diagnóstico de Supabase</span>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <div className={styles.body}>
@@ -114,9 +139,10 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
               {/* URL */}
               <section className={styles.section}>
                 <h4 className={styles.sectionTitle}>Configuración</h4>
-                <Row label="Supabase URL" value={
-                  <span className={styles.mono}>{result.supabaseUrl}</span>
-                } />
+                <Row
+                  label="Supabase URL"
+                  value={<span className={styles.mono}>{result.supabaseUrl}</span>}
+                />
                 <Row label="Revisado" value={new Date(result.checkedAt).toLocaleString('es-MX')} />
               </section>
 
@@ -125,12 +151,30 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
                 <h4 className={styles.sectionTitle}>Conexión</h4>
                 <Row
                   label="Clave anónima (lectura pública)"
-                  value={<StatusBadge ok={result.connection.anon.ok} label={result.connection.anon.ok ? `${result.connection.anon.ms} ms` : 'Sin conexión'} />}
+                  value={
+                    <StatusBadge
+                      ok={result.connection.anon.ok}
+                      label={
+                        result.connection.anon.ok
+                          ? `${result.connection.anon.ms} ms`
+                          : 'Sin conexión'
+                      }
+                    />
+                  }
                   sub={result.connection.anon.error}
                 />
                 <Row
                   label="Clave de servicio (escritura)"
-                  value={<StatusBadge ok={result.connection.admin.ok} label={result.connection.admin.ok ? `${result.connection.admin.ms} ms` : 'Sin conexión'} />}
+                  value={
+                    <StatusBadge
+                      ok={result.connection.admin.ok}
+                      label={
+                        result.connection.admin.ok
+                          ? `${result.connection.admin.ms} ms`
+                          : 'Sin conexión'
+                      }
+                    />
+                  }
                   sub={result.connection.admin.error}
                 />
               </section>
@@ -157,9 +201,12 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
                 />
                 <Row
                   label="Última sincronización"
-                  value={result.local.lastSyncedAt
-                    ? new Date(result.local.lastSyncedAt).toLocaleString('es-MX')
-                    : <span className={styles.warn}>Nunca</span>
+                  value={
+                    result.local.lastSyncedAt ? (
+                      new Date(result.local.lastSyncedAt).toLocaleString('es-MX')
+                    ) : (
+                      <span className={styles.warn}>Nunca</span>
+                    )
                   }
                 />
               </section>
@@ -171,8 +218,14 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
                   <p className={styles.error}>{result.remote.error}</p>
                 ) : (
                   <>
-                    <Row label="Ventas en Supabase" value={result.remote.sales !== null ? String(result.remote.sales) : '—'} />
-                    <Row label="Productos en Supabase" value={result.remote.products !== null ? String(result.remote.products) : '—'} />
+                    <Row
+                      label="Ventas en Supabase"
+                      value={result.remote.sales !== null ? String(result.remote.sales) : '—'}
+                    />
+                    <Row
+                      label="Productos en Supabase"
+                      value={result.remote.products !== null ? String(result.remote.products) : '—'}
+                    />
                   </>
                 )}
               </section>
@@ -180,7 +233,9 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
               {/* Ventas pendientes */}
               {result.unsyncedSales.length > 0 && (
                 <section className={styles.section}>
-                  <h4 className={styles.sectionTitle}>Ventas pendientes de push (últimas {result.unsyncedSales.length})</h4>
+                  <h4 className={styles.sectionTitle}>
+                    Ventas pendientes de push (últimas {result.unsyncedSales.length})
+                  </h4>
                   <table className={styles.table}>
                     <thead>
                       <tr>
@@ -190,7 +245,7 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
                       </tr>
                     </thead>
                     <tbody>
-                      {result.unsyncedSales.map(s => (
+                      {result.unsyncedSales.map((s) => (
                         <tr key={s.id}>
                           <td className={styles.mono}>{s.folio}</td>
                           <td>{fmt(s.total)}</td>
@@ -207,8 +262,7 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
                 <p className={pushResult.ok ? styles.actionOk : styles.actionErr}>
                   {pushResult.error
                     ? `Error: ${pushResult.error}`
-                    : `Push completado — ${pushResult.pushed} enviadas, ${pushResult.failed} fallidas`
-                  }
+                    : `Push completado — ${pushResult.pushed} enviadas, ${pushResult.failed} fallidas`}
                 </p>
               )}
               {pullResult && (
@@ -222,20 +276,32 @@ export default function DiagnosticModal({ onClose }: DiagnosticModalProps): Reac
 
         {!loading && result && (
           <div className={styles.footer}>
-            <button className={styles.btnSecondary} onClick={onClose}>Cerrar</button>
+            <button className={styles.btnSecondary} onClick={onClose}>
+              Cerrar
+            </button>
             <button
               className={styles.btnAction}
-              onClick={() => { void handlePull() }}
+              onClick={() => {
+                void handlePull()
+              }}
               disabled={pulling || pushing}
             >
               {pulling ? 'Sincronizando…' : 'Pull catálogo'}
             </button>
             <button
               className={styles.btnPrimary}
-              onClick={() => { void handlePush() }}
-              disabled={pushing || pulling || result.local.salesUnsynced === 0 && result.local.movementsUnsynced === 0}
+              onClick={() => {
+                void handlePush()
+              }}
+              disabled={
+                pushing ||
+                pulling ||
+                (result.local.salesUnsynced === 0 && result.local.movementsUnsynced === 0)
+              }
             >
-              {pushing ? 'Enviando…' : `Push pendientes (${result.local.salesUnsynced + result.local.movementsUnsynced})`}
+              {pushing
+                ? 'Enviando…'
+                : `Push pendientes (${result.local.salesUnsynced + result.local.movementsUnsynced})`}
             </button>
           </div>
         )}

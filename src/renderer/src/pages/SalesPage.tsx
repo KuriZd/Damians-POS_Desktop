@@ -6,7 +6,7 @@ import {
   useEffect,
   type ReactElement,
   type ChangeEvent,
-  type KeyboardEvent,
+  type KeyboardEvent
 } from 'react'
 import styles from './SalesPage.module.css'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
@@ -24,7 +24,7 @@ import {
   FiChevronUp,
   FiRefreshCw,
   FiX,
-  FiScissors,
+  FiScissors
 } from 'react-icons/fi'
 import { AiOutlineProduct } from 'react-icons/ai'
 import { FaHandshake } from 'react-icons/fa'
@@ -86,14 +86,16 @@ async function loadCatalog(): Promise<CatalogItem[]> {
           stock: p.stock ?? undefined,
           sku: p.sku,
           barcode: p.barcode,
-          loadOrder: items.length,
+          loadOrder: items.length
         })
       }
 
       if (result.items.length === 0) break
       page += 1
     }
-  } catch { /* sin productos locales */ }
+  } catch {
+    /* sin productos locales */
+  }
 
   try {
     let page = 1
@@ -111,14 +113,16 @@ async function loadCatalog(): Promise<CatalogItem[]> {
           price: s.price,
           type: 'service',
           code: s.code,
-          loadOrder: items.length,
+          loadOrder: items.length
         })
       }
 
       if (result.items.length === 0) break
       page += 1
     }
-  } catch { /* sin servicios locales */ }
+  } catch {
+    /* sin servicios locales */
+  }
 
   return items
 }
@@ -148,7 +152,12 @@ function matchesCatalogQuery(item: CatalogItem, query: string): boolean {
 
 function nowStr(): { date: string; time: string } {
   const d = new Date()
-  const date = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+  const date = d.toLocaleDateString('es-MX', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
   const time = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
   return { date, time }
 }
@@ -165,7 +174,15 @@ type SalesHeaderProps = {
   onCorte: () => void
 }
 
-function SalesHeader({ search, onSearch, onSearchKeyDown, searchRef, cashierName, onHistorial, onCorte }: SalesHeaderProps): ReactElement {
+function SalesHeader({
+  search,
+  onSearch,
+  onSearchKeyDown,
+  searchRef,
+  cashierName,
+  onHistorial,
+  onCorte
+}: SalesHeaderProps): ReactElement {
   const [clock, setClock] = useState(nowStr())
 
   useEffect(() => {
@@ -224,10 +241,10 @@ type SalesFiltersProps = {
 }
 
 const FILTERS: { key: FilterKey; label: string; icon: ReactElement }[] = [
-  { key: 'none',     label: 'Todos',          icon: <FiAlignLeft size={13} /> },
-  { key: 'age',      label: 'Recientes',       icon: <FiClock size={13} /> },
-  { key: 'products', label: 'Solo productos',  icon: <AiOutlineProduct size={13} /> },
-  { key: 'services', label: 'Solo servicios',  icon: <FaHandshake size={12} /> },
+  { key: 'none', label: 'Todos', icon: <FiAlignLeft size={13} /> },
+  { key: 'age', label: 'Recientes', icon: <FiClock size={13} /> },
+  { key: 'products', label: 'Solo productos', icon: <AiOutlineProduct size={13} /> },
+  { key: 'services', label: 'Solo servicios', icon: <FaHandshake size={12} /> }
 ]
 
 function SalesFilters({ active, onChange, total, filtered }: SalesFiltersProps): ReactElement {
@@ -272,17 +289,21 @@ function ProductCard({ item, onAdd }: ProductCardProps): ReactElement {
     >
       <div className={styles.cardInner}>
         <div className={styles.cardTop}>
-          <div className={`${styles.cardBadge} ${item.type === 'service' ? styles.cardBadgeSvc : styles.cardBadgeProd}`}>
-            {item.type === 'service'
-              ? <><FaHandshake size={10} /> Servicio</>
-              : <><AiOutlineProduct size={10} /> Producto</>}
+          <div
+            className={`${styles.cardBadge} ${item.type === 'service' ? styles.cardBadgeSvc : styles.cardBadgeProd}`}
+          >
+            {item.type === 'service' ? (
+              <>
+                <FaHandshake size={10} /> Servicio
+              </>
+            ) : (
+              <>
+                <AiOutlineProduct size={10} /> Producto
+              </>
+            )}
           </div>
-          {lowStock && !outStock && (
-            <span className={styles.cardLowStock}>Stock bajo</span>
-          )}
-          {outStock && (
-            <span className={styles.cardOutStock}>Sin stock</span>
-          )}
+          {lowStock && !outStock && <span className={styles.cardLowStock}>Stock bajo</span>}
+          {outStock && <span className={styles.cardOutStock}>Sin stock</span>}
         </div>
 
         <p className={styles.cardName}>{item.name}</p>
@@ -295,9 +316,7 @@ function ProductCard({ item, onAdd }: ProductCardProps): ReactElement {
               {item.stock} pzas
             </span>
           )}
-          {item.type === 'service' && (
-            <span className={styles.cardPerUnit}>por hoja</span>
-          )}
+          {item.type === 'service' && <span className={styles.cardPerUnit}>por hoja</span>}
         </div>
 
         <div className={styles.cardAddBtn}>
@@ -319,11 +338,22 @@ type CartRowProps = {
   onSizeChange: (uid: string, size: ServiceSize) => void
 }
 
-function CartRow({ entry, onQtyChange, onQtySet, onRemove, onToggleExpand, onSizeChange }: CartRowProps): ReactElement {
+function CartRow({
+  entry,
+  onQtyChange,
+  onQtySet,
+  onRemove,
+  onToggleExpand,
+  onSizeChange
+}: CartRowProps): ReactElement {
   const hasSize = entry.size !== undefined
   const [inputVal, setInputVal] = useState(String(entry.qty))
+  const [syncedQty, setSyncedQty] = useState(entry.qty)
 
-  useEffect(() => { setInputVal(String(entry.qty)) }, [entry.qty])
+  if (entry.qty !== syncedQty) {
+    setSyncedQty(entry.qty)
+    setInputVal(String(entry.qty))
+  }
 
   function handleQtyBlur(): void {
     const parsed = parseInt(inputVal, 10)
@@ -343,7 +373,11 @@ function CartRow({ entry, onQtyChange, onQtySet, onRemove, onToggleExpand, onSiz
         </div>
 
         <div className={styles.cartRowControls}>
-          <button className={styles.qtyBtn} onClick={() => onQtyChange(entry.uid, -1)} aria-label="Reducir">
+          <button
+            className={styles.qtyBtn}
+            onClick={() => onQtyChange(entry.uid, -1)}
+            aria-label="Reducir"
+          >
             <FiMinus size={12} />
           </button>
           <input
@@ -351,13 +385,19 @@ function CartRow({ entry, onQtyChange, onQtySet, onRemove, onToggleExpand, onSiz
             type="number"
             min="1"
             value={inputVal}
-            onChange={e => setInputVal(e.target.value)}
-            onFocus={e => e.target.select()}
+            onChange={(e) => setInputVal(e.target.value)}
+            onFocus={(e) => e.target.select()}
             onBlur={handleQtyBlur}
-            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+            }}
             aria-label="Cantidad"
           />
-          <button className={styles.qtyBtn} onClick={() => onQtyChange(entry.uid, +1)} aria-label="Aumentar">
+          <button
+            className={styles.qtyBtn}
+            onClick={() => onQtyChange(entry.uid, +1)}
+            aria-label="Aumentar"
+          >
             <FiPlus size={12} />
           </button>
         </div>
@@ -375,7 +415,11 @@ function CartRow({ entry, onQtyChange, onQtySet, onRemove, onToggleExpand, onSiz
                 {entry.expanded ? <FiChevronUp size={13} /> : <FiChevronDown size={13} />}
               </button>
             )}
-            <button className={styles.removeBtn} onClick={() => onRemove(entry.uid)} aria-label="Eliminar">
+            <button
+              className={styles.removeBtn}
+              onClick={() => onRemove(entry.uid)}
+              aria-label="Eliminar"
+            >
               <FiTrash2 size={13} />
             </button>
           </div>
@@ -385,7 +429,7 @@ function CartRow({ entry, onQtyChange, onQtySet, onRemove, onToggleExpand, onSiz
       {entry.expanded && hasSize && (
         <div className={styles.cartRowParams}>
           <span className={styles.paramsLabel}>Tamaño:</span>
-          {(['carta', 'oficio'] as ServiceSize[]).map(s => (
+          {(['carta', 'oficio'] as ServiceSize[]).map((s) => (
             <button
               key={s}
               className={`${styles.paramChip} ${entry.size === s ? styles.paramChipActive : ''}`}
@@ -409,7 +453,9 @@ function EmptyCart(): ReactElement {
         <FiShoppingBag size={36} />
       </div>
       <p className={styles.emptyCartTitle}>Sin artículos</p>
-      <p className={styles.emptyCartSub}>Busca o selecciona productos y servicios del catálogo para agregarlos a la venta.</p>
+      <p className={styles.emptyCartSub}>
+        Busca o selecciona productos y servicios del catálogo para agregarlos a la venta.
+      </p>
     </div>
   )
 }
@@ -427,14 +473,39 @@ type PaymentSectionProps = {
 }
 
 const METHODS: { key: PaymentMethod; label: string }[] = [
-  { key: 'efectivo',      label: 'Efectivo'      },
-  { key: 'tarjeta',       label: 'Tarjeta'       },
+  { key: 'efectivo', label: 'Efectivo' },
+  { key: 'tarjeta', label: 'Tarjeta' },
   { key: 'transferencia', label: 'Transferencia' },
-  { key: 'mixto',         label: 'Mixto'         },
+  { key: 'mixto', label: 'Mixto' }
 ]
 
+function buildPayments(
+  method: PaymentMethod,
+  total: number,
+  cashReceived: string
+): Array<{ method: string; amount: number }> {
+  if (method === 'mixto') {
+    const cashCents = Math.min(Math.round((parseFloat(cashReceived) || 0) * 100), total)
+    const cardCents = total - cashCents
+    if (cashCents > 0 && cardCents > 0) {
+      return [
+        { method: 'efectivo', amount: cashCents },
+        { method: 'tarjeta', amount: cardCents }
+      ]
+    }
+    return [{ method: cashCents >= total ? 'efectivo' : 'tarjeta', amount: total }]
+  }
+  return [{ method, amount: total }]
+}
+
 function PaymentSection({
-  method, total, cashReceived, onMethodChange, onCashChange, onCharge, disabled
+  method,
+  total,
+  cashReceived,
+  onMethodChange,
+  onCashChange,
+  onCharge,
+  disabled
 }: PaymentSectionProps): ReactElement {
   const received = Math.round((parseFloat(cashReceived) || 0) * 100)
   const change = received - total
@@ -442,7 +513,7 @@ function PaymentSection({
   return (
     <div className={styles.paySection}>
       <div className={styles.methodTabs}>
-        {METHODS.map(m => (
+        {METHODS.map((m) => (
           <button
             key={m.key}
             className={`${styles.methodTab} ${method === m.key ? styles.methodTabActive : ''}`}
@@ -466,12 +537,14 @@ function PaymentSection({
                 onChange={(e) => onCashChange(e.target.value)}
                 placeholder="0.00"
                 min={0}
-                step={0.50}
+                step={0.5}
               />
             </div>
           </div>
           {received > 0 && (
-            <div className={`${styles.changeRow} ${change < 0 ? styles.changeNeg : styles.changePos}`}>
+            <div
+              className={`${styles.changeRow} ${change < 0 ? styles.changeNeg : styles.changePos}`}
+            >
               <span>{change < 0 ? 'Faltan' : 'Cambio'}</span>
               <span className={styles.changeAmount}>{fmt(Math.abs(change))}</span>
             </div>
@@ -481,7 +554,9 @@ function PaymentSection({
 
       {method === 'mixto' && (
         <div className={styles.cashFields}>
-          <p className={styles.mixtoNote}>Ingresa el monto en efectivo; el resto se cobra a tarjeta.</p>
+          <p className={styles.mixtoNote}>
+            Ingresa el monto en efectivo; el resto se cobra a tarjeta.
+          </p>
           <div className={styles.cashField}>
             <label className={styles.cashLabel}>Efectivo</label>
             <div className={styles.cashInputWrap}>
@@ -493,7 +568,7 @@ function PaymentSection({
                 onChange={(e) => onCashChange(e.target.value)}
                 placeholder="0.00"
                 min={0}
-                step={0.50}
+                step={0.5}
               />
             </div>
           </div>
@@ -506,11 +581,7 @@ function PaymentSection({
         </div>
       )}
 
-      <button
-        className={styles.chargeBtn}
-        onClick={onCharge}
-        disabled={disabled}
-      >
+      <button className={styles.chargeBtn} onClick={onCharge} disabled={disabled}>
         Cobrar {!disabled && fmt(total)}
       </button>
     </div>
@@ -520,10 +591,10 @@ function PaymentSection({
 // ─── Historial Modal ─────────────────────────────────────────────────────────
 
 const METHOD_LABEL: Record<string, string> = {
-  efectivo:      'Efectivo',
-  tarjeta:       'Tarjeta',
+  efectivo: 'Efectivo',
+  tarjeta: 'Tarjeta',
   transferencia: 'Transferencia',
-  mixto:         'Mixto',
+  mixto: 'Mixto'
 }
 
 type HistorialModalProps = {
@@ -535,15 +606,18 @@ function HistorialModal({ onClose }: HistorialModalProps): ReactElement {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    void window.pos.sales.recent(40).then(data => {
-      setSales(data)
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    void window.pos.sales
+      .recent(40)
+      .then((data) => {
+        setSales(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+      <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div className={styles.modalTitle}>
             <FiClock size={18} />
@@ -576,13 +650,21 @@ function HistorialModal({ onClose }: HistorialModalProps): ReactElement {
                 </tr>
               </thead>
               <tbody>
-                {sales.map(s => {
+                {sales.map((s) => {
                   const d = new Date(s.createdAt)
                   return (
                     <tr key={s.id}>
                       <td className={styles.histFolio}>{s.folio}</td>
-                      <td>{d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                      <td>{d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>
+                        {d.toLocaleDateString('es-MX', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td>
+                        {d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
                       <td>{s.cashierName}</td>
                       <td className={styles.histCenter}>{s.itemCount}</td>
                       <td>{METHOD_LABEL[s.paymentMethod] ?? s.paymentMethod}</td>
@@ -631,7 +713,12 @@ type CorteModalProps = {
   onClose: () => void
 }
 
-function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModalProps): ReactElement {
+function CorteModal({
+  cashierId,
+  cashierName,
+  cashierRole,
+  onClose
+}: CorteModalProps): ReactElement {
   const needsAuth = cashierRole === 'CASHIER'
 
   const [authorized, setAuthorized] = useState(!needsAuth)
@@ -655,15 +742,19 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
 
   function loadData(): void {
     setLoading(true)
-    void window.pos.sales.corte(cashierId)
-      .then((d: CorteData) => { setData(d); setLoading(false) })
+    void window.pos.sales
+      .corte(cashierId)
+      .then((d: CorteData) => {
+        setData(d)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }
 
   useEffect(() => {
     if (!authorized) return
     loadData()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authorized, cashierId])
 
   async function handleAuth(): Promise<void> {
@@ -671,7 +762,7 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
     setAuthLoading(true)
     setAuthError(null)
     try {
-      const result = await window.pos.auth.verifySupervisor(authUsername, authPassword) as
+      const result = (await window.pos.auth.verifySupervisor(authUsername, authPassword)) as
         | { ok: true; name: string; role: string }
         | { ok: false; error: string }
       if (result.ok) {
@@ -692,8 +783,11 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
 
   const openedAtLabel = data
     ? new Date(data.openedAt).toLocaleString('es-MX', {
-        day: 'numeric', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       })
     : '—'
 
@@ -703,7 +797,7 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
     setConfirmError(null)
     try {
       const countedArg = hasCounted ? countedCents : undefined
-      const result = await window.pos.sales.confirmCorte(cashierId, countedArg) as
+      const result = (await window.pos.sales.confirmCorte(cashierId, countedArg)) as
         | { ok: true; sessionId: number }
         | { ok: false; error: string }
       if (result.ok) {
@@ -724,11 +818,11 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
     setWithdrawalLoading(true)
     setWithdrawalError(null)
     try {
-      const result = await window.pos.sales.cashMovement({
+      const result = (await window.pos.sales.cashMovement({
         type: 'OUT',
         amount: cents,
-        reason: withdrawalReason.trim() || undefined,
-      }) as { ok: true; id: number } | { ok: false; error: string }
+        reason: withdrawalReason.trim() || undefined
+      })) as { ok: true; id: number } | { ok: false; error: string }
       if (result.ok) {
         setWithdrawalView(false)
         setWithdrawalAmount('')
@@ -746,7 +840,7 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={`${styles.modalBox} ${styles.corteBox}`} onClick={e => e.stopPropagation()}>
+      <div className={`${styles.modalBox} ${styles.corteBox}`} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div className={styles.modalTitle}>
             <FiScissors size={18} />
@@ -761,7 +855,9 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
           {withdrawalView ? (
             <div className={styles.corteAuth}>
               <p className={styles.corteAuthTitle}>Retiro de efectivo</p>
-              <p className={styles.corteAuthSub}>El monto se descontará del efectivo esperado en caja.</p>
+              <p className={styles.corteAuthSub}>
+                El monto se descontará del efectivo esperado en caja.
+              </p>
               <div className={styles.corteAuthForm}>
                 <div className={styles.corteAuthField}>
                   <label className={styles.corteAuthLabel}>Monto a retirar</label>
@@ -774,22 +870,32 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                       step="0.01"
                       placeholder="0.00"
                       value={withdrawalAmount}
-                      onChange={e => setWithdrawalAmount(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { void handleWithdrawal() } }}
+                      onChange={(e) => setWithdrawalAmount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          void handleWithdrawal()
+                        }
+                      }}
                       autoFocus
                       style={{ flex: 1 }}
                     />
                   </div>
                 </div>
                 <div className={styles.corteAuthField}>
-                  <label className={styles.corteAuthLabel}>Motivo <span className={styles.corteSectionOptional}>(opcional)</span></label>
+                  <label className={styles.corteAuthLabel}>
+                    Motivo <span className={styles.corteSectionOptional}>(opcional)</span>
+                  </label>
                   <input
                     className={styles.corteAuthInput}
                     type="text"
                     placeholder="Ej. Pago a proveedor, gastos operativos…"
                     value={withdrawalReason}
-                    onChange={e => setWithdrawalReason(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { void handleWithdrawal() } }}
+                    onChange={(e) => setWithdrawalReason(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void handleWithdrawal()
+                      }
+                    }}
                   />
                 </div>
                 {withdrawalError && <p className={styles.corteError}>{withdrawalError}</p>}
@@ -798,7 +904,9 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
           ) : !authorized ? (
             <div className={styles.corteAuth}>
               <p className={styles.corteAuthTitle}>Autorización requerida</p>
-              <p className={styles.corteAuthSub}>Ingresa las credenciales de un supervisor o administrador para continuar.</p>
+              <p className={styles.corteAuthSub}>
+                Ingresa las credenciales de un supervisor o administrador para continuar.
+              </p>
               <div className={styles.corteAuthForm}>
                 <div className={styles.corteAuthField}>
                   <label className={styles.corteAuthLabel}>Usuario</label>
@@ -807,8 +915,12 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                     type="text"
                     placeholder="Usuario"
                     value={authUsername}
-                    onChange={e => setAuthUsername(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { void handleAuth() } }}
+                    onChange={(e) => setAuthUsername(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void handleAuth()
+                      }
+                    }}
                     autoFocus
                   />
                 </div>
@@ -819,20 +931,30 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                     type="password"
                     placeholder="Contraseña"
                     value={authPassword}
-                    onChange={e => setAuthPassword(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { void handleAuth() } }}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void handleAuth()
+                      }
+                    }}
                   />
                 </div>
                 {authError && <p className={styles.corteError}>{authError}</p>}
                 <button
                   className={styles.corteConfirmBtn}
-                  onClick={() => { void handleAuth() }}
+                  onClick={() => {
+                    void handleAuth()
+                  }}
                   disabled={authLoading || !authUsername.trim() || !authPassword}
                 >
-                  {authLoading
-                    ? <><FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Verificando…</>
-                    : 'Autorizar'
-                  }
+                  {authLoading ? (
+                    <>
+                      <FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />{' '}
+                      Verificando…
+                    </>
+                  ) : (
+                    'Autorizar'
+                  )}
                 </button>
               </div>
             </div>
@@ -848,16 +970,23 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
               <div className={styles.corteSuccessIcon}>✓</div>
               <p className={styles.corteSuccessTitle}>Corte realizado</p>
               <p className={styles.corteSuccessSub}>
-                Sesión cerrada · {data.tickets} {data.tickets === 1 ? 'venta' : 'ventas'} por {fmt(data.totalVentas)}
+                Sesión cerrada · {data.tickets} {data.tickets === 1 ? 'venta' : 'ventas'} por{' '}
+                {fmt(data.totalVentas)}
               </p>
             </div>
           ) : (
             <>
               {/* Meta de sesión */}
               <div className={styles.corteMeta}>
-                <span className={styles.corteMetaItem}><strong>Cajero:</strong> {cashierName}</span>
-                <span className={styles.corteMetaItem}><strong>Apertura:</strong> {openedAtLabel}</span>
-                <span className={styles.corteMetaItem}><strong>Saldo inicial:</strong> {fmt(data.initialCash)}</span>
+                <span className={styles.corteMetaItem}>
+                  <strong>Cajero:</strong> {cashierName}
+                </span>
+                <span className={styles.corteMetaItem}>
+                  <strong>Apertura:</strong> {openedAtLabel}
+                </span>
+                <span className={styles.corteMetaItem}>
+                  <strong>Saldo inicial:</strong> {fmt(data.initialCash)}
+                </span>
               </div>
 
               {/* KPIs de ventas */}
@@ -898,16 +1027,28 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                   <p className={styles.corteNoMovements}>Sin movimientos en esta sesión.</p>
                 ) : (
                   <div className={styles.corteMovList}>
-                    {data.movements.map(m => (
-                      <div key={m.id} className={`${styles.corteMovRow} ${m.type === 'IN' ? styles.corteMovIn : styles.corteMovOut}`}>
-                        <span className={styles.corteMovType}>{m.type === 'IN' ? 'Entrada' : 'Retiro'}</span>
+                    {data.movements.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`${styles.corteMovRow} ${m.type === 'IN' ? styles.corteMovIn : styles.corteMovOut}`}
+                      >
+                        <span className={styles.corteMovType}>
+                          {m.type === 'IN' ? 'Entrada' : 'Retiro'}
+                        </span>
                         <span className={styles.corteMovReason}>{m.reason ?? '—'}</span>
-                        <span className={styles.corteMovAmt}>{m.type === 'IN' ? '+' : '−'}{fmt(m.amount)}</span>
+                        <span className={styles.corteMovAmt}>
+                          {m.type === 'IN' ? '+' : '−'}
+                          {fmt(m.amount)}
+                        </span>
                       </div>
                     ))}
                     <div className={styles.corteMovTotals}>
-                      <span>Entradas: <strong>{fmt(data.totalEntradas)}</strong></span>
-                      <span>Salidas: <strong>{fmt(data.totalSalidas)}</strong></span>
+                      <span>
+                        Entradas: <strong>{fmt(data.totalEntradas)}</strong>
+                      </span>
+                      <span>
+                        Salidas: <strong>{fmt(data.totalSalidas)}</strong>
+                      </span>
                     </div>
                   </div>
                 )}
@@ -942,7 +1083,10 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                     <span className={styles.corteArqueoAmt}>{fmt(data.expected)}</span>
                   </div>
                   <div className={styles.corteArqueoRow}>
-                    <label htmlFor="counted-input">Efectivo contado <span className={styles.corteSectionOptional}>(opcional)</span></label>
+                    <label htmlFor="counted-input">
+                      Efectivo contado{' '}
+                      <span className={styles.corteSectionOptional}>(opcional)</span>
+                    </label>
                     <div className={styles.cashInputWrap} style={{ width: 140 }}>
                       <span className={styles.cashPrefix}>$</span>
                       <input
@@ -953,12 +1097,14 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                         className={styles.cashInput}
                         placeholder="0.00"
                         value={counted}
-                        onChange={e => setCounted(e.target.value)}
+                        onChange={(e) => setCounted(e.target.value)}
                       />
                     </div>
                   </div>
                   {hasCounted && (
-                    <div className={`${styles.changeRow} ${diff >= 0 ? styles.changePos : styles.changeNeg}`}>
+                    <div
+                      className={`${styles.changeRow} ${diff >= 0 ? styles.changePos : styles.changeNeg}`}
+                    >
                       <span>{diff >= 0 ? 'Sobrante' : 'Faltante'}</span>
                       <span className={styles.changeAmount}>{fmt(Math.abs(diff))}</span>
                     </div>
@@ -966,9 +1112,7 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
                 </div>
               </div>
 
-              {confirmError && (
-                <p className={styles.corteError}>{confirmError}</p>
-              )}
+              {confirmError && <p className={styles.corteError}>{confirmError}</p>}
             </>
           )}
         </div>
@@ -976,7 +1120,10 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
         <div className={styles.corteFooter}>
           <button
             className={styles.corteRetiroBtn}
-            onClick={() => { setWithdrawalView(true); setWithdrawalError(null) }}
+            onClick={() => {
+              setWithdrawalView(true)
+              setWithdrawalError(null)
+            }}
             disabled={!authorized || confirmed || withdrawalView || loading}
           >
             Retiro de efectivo
@@ -984,40 +1131,70 @@ function CorteModal({ cashierId, cashierName, cashierRole, onClose }: CorteModal
           <div className={styles.corteFooterActions}>
             {withdrawalView ? (
               <>
-                <button className={styles.corteCancelBtn} onClick={() => { setWithdrawalView(false); setWithdrawalError(null) }} disabled={withdrawalLoading}>
+                <button
+                  className={styles.corteCancelBtn}
+                  onClick={() => {
+                    setWithdrawalView(false)
+                    setWithdrawalError(null)
+                  }}
+                  disabled={withdrawalLoading}
+                >
                   Cancelar
                 </button>
                 <button
                   className={styles.corteConfirmBtn}
-                  onClick={() => { void handleWithdrawal() }}
-                  disabled={withdrawalLoading || !withdrawalAmount || parseFloat(withdrawalAmount) <= 0}
-                >
-                  {withdrawalLoading
-                    ? <><FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Guardando…</>
-                    : 'Guardar retiro'
+                  onClick={() => {
+                    void handleWithdrawal()
+                  }}
+                  disabled={
+                    withdrawalLoading || !withdrawalAmount || parseFloat(withdrawalAmount) <= 0
                   }
+                >
+                  {withdrawalLoading ? (
+                    <>
+                      <FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />{' '}
+                      Guardando…
+                    </>
+                  ) : (
+                    'Guardar retiro'
+                  )}
                 </button>
               </>
             ) : confirmed ? (
-              <button className={styles.corteCloseBtn} onClick={onClose}>Cerrar</button>
+              <button className={styles.corteCloseBtn} onClick={onClose}>
+                Cerrar
+              </button>
             ) : !authorized ? (
-              <button className={styles.corteCancelBtn} onClick={onClose}>Cancelar</button>
-            ) : !loading && data && (
-              <>
-                <button className={styles.corteCancelBtn} onClick={onClose} disabled={confirming}>
-                  Cancelar
-                </button>
-                <button
-                  className={styles.corteConfirmBtn}
-                  onClick={() => { void handleConfirm() }}
-                  disabled={confirming}
-                >
-                  {confirming
-                    ? <><FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Procesando…</>
-                    : <><FiScissors size={14} /> Confirmar corte</>
-                  }
-                </button>
-              </>
+              <button className={styles.corteCancelBtn} onClick={onClose}>
+                Cancelar
+              </button>
+            ) : (
+              !loading &&
+              data && (
+                <>
+                  <button className={styles.corteCancelBtn} onClick={onClose} disabled={confirming}>
+                    Cancelar
+                  </button>
+                  <button
+                    className={styles.corteConfirmBtn}
+                    onClick={() => {
+                      void handleConfirm()
+                    }}
+                    disabled={confirming}
+                  >
+                    {confirming ? (
+                      <>
+                        <FiRefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />{' '}
+                        Procesando…
+                      </>
+                    ) : (
+                      <>
+                        <FiScissors size={14} /> Confirmar corte
+                      </>
+                    )}
+                  </button>
+                </>
+              )
             )}
           </div>
         </div>
@@ -1068,16 +1245,16 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     if (q) {
       items = scanMode
         ? items.filter(
-            i =>
+            (i) =>
               normalizeSearch(i.sku ?? '') === q ||
               normalizeSearch(i.barcode ?? '') === q ||
               normalizeSearch(i.code ?? '') === q
           )
-        : items.filter(i => matchesCatalogQuery(i, q))
+        : items.filter((i) => matchesCatalogQuery(i, q))
     }
 
-    if (filter === 'products') items = items.filter(i => i.type === 'product')
-    if (filter === 'services') items = items.filter(i => i.type === 'service')
+    if (filter === 'products') items = items.filter((i) => i.type === 'product')
+    if (filter === 'services') items = items.filter((i) => i.type === 'service')
 
     const copy = [...items]
     if (filter === 'age') {
@@ -1096,47 +1273,50 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   // ── Cart ops ─────────────────────────────────────────────────
 
   const addToCart = useCallback((item: CatalogItem) => {
-    setCart(prev => {
-      const existing = prev.find(e => e.type === item.type && e.itemId === item.id)
+    setCart((prev) => {
+      const existing = prev.find((e) => e.type === item.type && e.itemId === item.id)
       if (existing) {
-        return prev.map(e => e.uid === existing.uid ? { ...e, qty: e.qty + 1 } : e)
+        return prev.map((e) => (e.uid === existing.uid ? { ...e, qty: e.qty + 1 } : e))
       }
-      return [...prev, {
-        uid: uid(),
-        itemId: item.id,
-        publicId: item.publicId,
-        name: item.name,
-        price: item.price,
-        qty: 1,
-        type: item.type,
-        size: item.hasSize ? 'carta' : undefined,
-        expanded: false,
-      }]
+      return [
+        ...prev,
+        {
+          uid: uid(),
+          itemId: item.id,
+          publicId: item.publicId,
+          name: item.name,
+          price: item.price,
+          qty: 1,
+          type: item.type,
+          size: item.hasSize ? 'carta' : undefined,
+          expanded: false
+        }
+      ]
     })
   }, [])
 
   const changeQty = useCallback((entryUid: string, delta: number) => {
-    setCart(prev =>
+    setCart((prev) =>
       prev
-        .map(e => e.uid === entryUid ? { ...e, qty: e.qty + delta } : e)
-        .filter(e => e.qty > 0)
+        .map((e) => (e.uid === entryUid ? { ...e, qty: e.qty + delta } : e))
+        .filter((e) => e.qty > 0)
     )
   }, [])
 
   const setQty = useCallback((entryUid: string, qty: number) => {
-    setCart(prev => prev.map(e => e.uid === entryUid ? { ...e, qty } : e))
+    setCart((prev) => prev.map((e) => (e.uid === entryUid ? { ...e, qty } : e)))
   }, [])
 
   const removeEntry = useCallback((entryUid: string) => {
-    setCart(prev => prev.filter(e => e.uid !== entryUid))
+    setCart((prev) => prev.filter((e) => e.uid !== entryUid))
   }, [])
 
   const toggleExpand = useCallback((entryUid: string) => {
-    setCart(prev => prev.map(e => e.uid === entryUid ? { ...e, expanded: !e.expanded } : e))
+    setCart((prev) => prev.map((e) => (e.uid === entryUid ? { ...e, expanded: !e.expanded } : e)))
   }, [])
 
   const changeSize = useCallback((entryUid: string, size: ServiceSize) => {
-    setCart(prev => prev.map(e => e.uid === entryUid ? { ...e, size } : e))
+    setCart((prev) => prev.map((e) => (e.uid === entryUid ? { ...e, size } : e)))
   }, [])
 
   const clearCart = useCallback(() => {
@@ -1179,7 +1359,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
     const normalizedCode = code.toLowerCase()
     const exactMatch = catalog.find(
-      item =>
+      (item) =>
         item.sku?.toLowerCase() === normalizedCode ||
         item.barcode?.toLowerCase() === normalizedCode ||
         item.code?.toLowerCase() === normalizedCode
@@ -1201,21 +1381,31 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     try {
       const result = await window.pos.sales.create({
         cashierId: user.id,
-        items: cart.map(e => ({
+        items: cart.map((e) => ({
           itemType: e.type,
           productPublicId: e.type === 'product' ? e.publicId : null,
           servicePublicId: e.type === 'service' ? e.publicId : null,
           qty: e.qty,
           price: e.price,
           discount: 0,
-          lineTotal: e.price * e.qty,
+          lineTotal: e.price * e.qty
         })),
         discount,
-        payment: {
-          method: payMethod,
-          amount: Math.round((parseFloat(cashReceived) || 0) * 100) || total,
-        },
+        payments: buildPayments(payMethod, total, cashReceived)
       })
+      if (!result.ok) {
+        if (result.error === 'STOCK_INSUFICIENTE' && result.items && result.items.length > 0) {
+          const detail = result.items
+            .map((i) => `${i.name} (disponible: ${i.available}, solicitado: ${i.requested})`)
+            .join('; ')
+          setToast({ type: 'error', message: `Stock insuficiente — ${detail}` })
+        } else if (result.error === 'PAGO_INSUFICIENTE') {
+          setToast({ type: 'error', message: 'El pago no cubre el total de la venta.' })
+        } else {
+          setToast({ type: 'error', message: `Error al registrar venta: ${result.error}` })
+        }
+        return
+      }
       clearCart()
       setToast({ type: 'success', message: `Venta ${result.folio} registrada por ${fmt(total)}` })
     } catch (err) {
@@ -1241,15 +1431,22 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
       )}
 
       {toast && (
-        <div className={`${styles.toast} ${toast.type === 'success' ? styles.toastSuccess : styles.toastError}`}>
+        <div
+          className={`${styles.toast} ${toast.type === 'success' ? styles.toastSuccess : styles.toastError}`}
+        >
           {toast.message}
-          <button className={styles.toastClose} onClick={() => setToast(null)}>×</button>
+          <button className={styles.toastClose} onClick={() => setToast(null)}>
+            ×
+          </button>
         </div>
       )}
 
       <SalesHeader
         search={search}
-        onSearch={(v) => { setScanMode(false); setSearch(v) }}
+        onSearch={(v) => {
+          setScanMode(false)
+          setSearch(v)
+        }}
         onSearchKeyDown={handleSearchKeyDown}
         searchRef={searchRef}
         cashierName={user.name}
@@ -1275,16 +1472,30 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
           ) : filtered.length === 0 ? (
             <div className={styles.noResults}>
               <FiSearch size={28} />
-              <p>{catalog.length === 0 ? 'No hay productos ni servicios en la base de datos local.' : <>Sin resultados para <strong>"{search}"</strong></>}</p>
+              <p>
+                {catalog.length === 0 ? (
+                  'No hay productos ni servicios en la base de datos local.'
+                ) : (
+                  <>
+                    Sin resultados para <strong>&ldquo;{search}&rdquo;</strong>
+                  </>
+                )}
+              </p>
               {catalog.length > 0 && (
-                <button className={styles.noResultsReset} onClick={() => { setSearch(''); setFilter('none') }}>
+                <button
+                  className={styles.noResultsReset}
+                  onClick={() => {
+                    setSearch('')
+                    setFilter('none')
+                  }}
+                >
                   Limpiar filtros
                 </button>
               )}
             </div>
           ) : (
             <div className={styles.grid}>
-              {filtered.map(item => (
+              {filtered.map((item) => (
                 <ProductCard key={`${item.type}-${item.id}`} item={item} onAdd={addToCart} />
               ))}
             </div>
@@ -1305,9 +1516,10 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
           {/* Cart list */}
           <div className={styles.cartList}>
-            {cart.length === 0
-              ? <EmptyCart />
-              : cart.map(entry => (
+            {cart.length === 0 ? (
+              <EmptyCart />
+            ) : (
+              cart.map((entry) => (
                 <CartRow
                   key={entry.uid}
                   entry={entry}
@@ -1318,15 +1530,12 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
                   onSizeChange={changeSize}
                 />
               ))
-            }
+            )}
           </div>
 
           {/* Notes */}
           <div className={styles.notesSection}>
-            <button
-              className={styles.notesToggle}
-              onClick={() => setNotesOpen(o => !o)}
-            >
+            <button className={styles.notesToggle} onClick={() => setNotesOpen((o) => !o)}>
               <FiFileText size={13} />
               {notesOpen ? 'Ocultar notas' : 'Agregar nota'}
               {notesOpen ? <FiChevronUp size={12} /> : <FiChevronDown size={12} />}
@@ -1336,7 +1545,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
                 className={styles.notesInput}
                 placeholder="Observaciones de la venta, instrucciones especiales…"
                 value={notes}
-                onChange={e => setNotes(e.target.value)}
+                onChange={(e) => setNotes(e.target.value)}
                 rows={2}
               />
             )}
@@ -1376,7 +1585,9 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
             cashReceived={cashReceived}
             onMethodChange={setPayMethod}
             onCashChange={setCashReceived}
-            onCharge={() => { void handleCharge() }}
+            onCharge={() => {
+              void handleCharge()
+            }}
             disabled={cart.length === 0 || charging}
           />
         </aside>

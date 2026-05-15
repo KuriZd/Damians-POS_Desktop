@@ -96,7 +96,10 @@
   color: #374263;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .headerBtn:hover {
@@ -267,7 +270,10 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  transition: max-height 0.28s ease, border-color 0.15s, box-shadow 0.15s;
+  transition:
+    max-height 0.28s ease,
+    border-color 0.15s,
+    box-shadow 0.15s;
   z-index: 1;
 }
 
@@ -631,7 +637,9 @@
   align-items: center;
   justify-content: center;
   color: #6a7190;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .qtyBtn:hover {
@@ -660,7 +668,9 @@
   background: transparent;
   outline: none;
   padding: 2px 2px;
-  transition: border-color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
   -moz-appearance: textfield;
 }
 
@@ -724,7 +734,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .removeBtn:hover {
@@ -1022,7 +1034,9 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.15s, transform 0.12s;
+  transition:
+    background 0.15s,
+    transform 0.12s;
   box-shadow: 0 4px 14px rgba(91, 121, 255, 0.35);
 }
 
@@ -1090,8 +1104,14 @@
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ─── Historial Modal ─────────────────────────────────────────────────────── */
@@ -1149,7 +1169,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .modalClose:hover {
@@ -1379,7 +1401,9 @@
   color: #374263;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .corteRetiroBtn:hover:not(:disabled) {
@@ -1404,7 +1428,9 @@
   font-weight: 700;
   color: #374263;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .corteCloseBtn:hover {
@@ -1446,7 +1472,9 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.12s, opacity 0.12s;
+  transition:
+    background 0.12s,
+    opacity 0.12s;
 }
 
 .corteConfirmBtn:hover:not(:disabled) {
@@ -1648,7 +1676,6 @@
   background: #f4f6fb;
   border-top: 1px solid #eaedfa;
 }
-
 
 /* ─── Hist ───────────────────────────────────────────────────────────────── */
 

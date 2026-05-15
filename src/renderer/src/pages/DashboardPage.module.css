@@ -55,7 +55,9 @@
   font-weight: 600;
   color: #374263;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   flex-shrink: 0;
 }
 
@@ -96,11 +98,7 @@
 .kpiSkeletonCard {
   height: 92px;
   border-radius: 14px;
-  background: linear-gradient(160deg,
-      #edf4fb 0%,
-      #dbe9f6 40%,
-      #f4ede6 75%,
-      #ead8c8 100%);
+  background: linear-gradient(160deg, #edf4fb 0%, #dbe9f6 40%, #f4ede6 75%, #ead8c8 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
 }
@@ -389,7 +387,9 @@
 
 .kpiClickable {
   cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.12s;
+  transition:
+    box-shadow 0.15s,
+    transform 0.12s;
 }
 
 .kpiClickable:hover {
@@ -455,9 +455,16 @@
   transition: background 0.12s;
 }
 
-.lsClose:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.lsClose:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
 
-.lsBody { overflow-y: auto; flex: 1; }
+.lsBody {
+  overflow-y: auto;
+  flex: 1;
+}
 
 .lsLoading,
 .lsEmpty {
@@ -473,7 +480,10 @@
   font-size: 13px;
 }
 
-.lsTable thead tr { background: #f8f9fd; border-bottom: 1.5px solid #e8ecf5; }
+.lsTable thead tr {
+  background: #f8f9fd;
+  border-bottom: 1.5px solid #e8ecf5;
+}
 
 .lsTable th {
   padding: 10px 16px;
@@ -486,22 +496,55 @@
   white-space: nowrap;
 }
 
-.lsTable tbody tr { border-bottom: 1px solid #f0f2f8; transition: background 0.1s; }
-.lsTable tbody tr:last-child { border-bottom: none; }
-.lsTable tbody tr:hover { background: #f8f9fd; }
-.lsTable td { padding: 10px 16px; color: #374263; }
+.lsTable tbody tr {
+  border-bottom: 1px solid #f0f2f8;
+  transition: background 0.1s;
+}
+.lsTable tbody tr:last-child {
+  border-bottom: none;
+}
+.lsTable tbody tr:hover {
+  background: #f8f9fd;
+}
+.lsTable td {
+  padding: 10px 16px;
+  color: #374263;
+}
 
-.lsCenter { text-align: center; }
-.lsSku { font-family: monospace; font-size: 12px; color: #8890a4; }
-.lsStockOut { color: #dc2626; font-weight: 700; }
-.lsStockLow { color: #d97706; font-weight: 700; }
+.lsCenter {
+  text-align: center;
+}
+.lsSku {
+  font-family: monospace;
+  font-size: 12px;
+  color: #8890a4;
+}
+.lsStockOut {
+  color: #dc2626;
+  font-weight: 700;
+}
+.lsStockLow {
+  color: #d97706;
+  font-weight: 700;
+}
 
-.lsBadge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; }
-.lsBadgeOut { background: #fee2e2; color: #dc2626; }
-.lsBadgeLow { background: #fef3c7; color: #d97706; }
+.lsBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.lsBadgeOut {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.lsBadgeLow {
+  background: #fef3c7;
+  color: #d97706;
+}
 
 @media (max-width: 1100px) {
-
   .kpiRow,
   .kpiSkeleton {
     grid-template-columns: repeat(2, 1fr);
@@ -509,7 +552,6 @@
 }
 
 @media (max-width: 640px) {
-
   .kpiRow,
   .kpiSkeleton {
     grid-template-columns: 1fr;

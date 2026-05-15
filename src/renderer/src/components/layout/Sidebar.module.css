@@ -1,246 +1,246 @@
 /* ─── Sidebar shell ─────────────────────────────────────────── */
 .sidebar {
-    width: 200px;
-    min-height: 100vh;
-    background: #f4f4f4;
-    border-right: 1px solid #dddddd;
-    display: flex;
-    flex-direction: column;
-    padding: 10px 10px 14px;
-    box-sizing: border-box;
-    transition: width 0.2s ease;
-    position: sticky;
-    top: 0;
-    align-self: start;
-    max-height: 100vh;
-    overflow-y: auto;
+  width: 200px;
+  min-height: 100vh;
+  background: #f4f4f4;
+  border-right: 1px solid #dddddd;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 14px;
+  box-sizing: border-box;
+  transition: width 0.2s ease;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebarCollapsed {
-    width: 72px;
-    padding-inline: 6px;
+  width: 72px;
+  padding-inline: 6px;
 }
 
 /* ─── Top block ──────────────────────────────────────────────── */
 .topBlock {
-    margin-bottom: 16px;
+  margin-bottom: 16px;
 }
 
 .topRow {
-    display: flex;
-    flex-direction: row;
-    /* toggle + nombre en la misma fila */
-    align-items: center;
-    gap: 10px;
+  display: flex;
+  flex-direction: row;
+  /* toggle + nombre en la misma fila */
+  align-items: center;
+  gap: 10px;
 }
 
 .topBlockCollapsed .topRow {
-    justify-content: center;
+  justify-content: center;
 }
 
 .toggleButton {
-    width: 44px;
-    height: 44px;
-    border: none;
-    background: transparent;
-    border-radius: 10px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 5px;
-    padding: 10px;
-    flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  padding: 10px;
+  flex-shrink: 0;
 }
 
 .toggleButton:hover {
-    background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .toggleButton:focus-visible {
-    outline: 2px solid #5b79ff;
-    outline-offset: 2px;
+  outline: 2px solid #5b79ff;
+  outline-offset: 2px;
 }
 
 .toggleButton span {
-    display: block;
-    width: 18px;
-    height: 2px;
-    background: #444;
-    border-radius: 2px;
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #444;
+  border-radius: 2px;
 }
 
 /* ─── User block ─────────────────────────────────────────────── */
 .userBlock {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    overflow: hidden;
-    /* evita desbordamiento en nombres largos */
-    min-width: 0;
-    /* permite que flex truncate correctamente */
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  /* evita desbordamiento en nombres largos */
+  min-width: 0;
+  /* permite que flex truncate correctamente */
 }
 
 .userName {
-    margin: 0;
-    font-size: 0.96rem;
-    font-weight: 700;
-    color: #1a1a1a;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .userRole {
-    margin: 0;
-    font-size: 0.78rem;
-    color: #5b79ff;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  margin: 0;
+  font-size: 0.78rem;
+  color: #5b79ff;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ─── Nav / menu ─────────────────────────────────────────────── */
 .menu {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .menuItem {
-    width: 100%;
-    height: 62px;
-    border: none;
-    background: transparent;
-    border-radius: 10px;
-    padding: 5px 12px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.2s ease;
-    flex-shrink: 0;
+  width: 100%;
+  height: 62px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 5px 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
 }
 
 .menuItem:hover {
-    background: rgba(81, 129, 255, 0.08);
+  background: rgba(81, 129, 255, 0.08);
 }
 
 .menuItem:focus-visible {
-    outline: 2px solid #5b79ff;
-    outline-offset: 2px;
+  outline: 2px solid #5b79ff;
+  outline-offset: 2px;
 }
 
 .menuItemActive {
-    background: #dfe9ff;
+  background: #dfe9ff;
 }
 
 .menuItemCollapsed {
-    justify-content: center;
-    padding-inline: 8px;
+  justify-content: center;
+  padding-inline: 8px;
 }
 
 .menuIcon {
-    width: 34px;
-    height: 34px;
-    object-fit: contain;
-    flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .menuIconHome {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-    flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .menuLabel {
-    font-size: 1rem;
-    color: #2d2d2d;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
+  font-size: 1rem;
+  color: #2d2d2d;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 /* ─── Bottom block (logout) ──────────────────────────────────── */
 .bottomBlock {
-    margin-top: auto;
-    padding-top: 16px;
+  margin-top: auto;
+  padding-top: 16px;
 }
 
 .logoutButton {
-    width: 100%;
-    min-height: 54px;
-    border: none;
-    background: transparent;
-    border-radius: 10px;
-    padding: 10px 12px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.2s ease;
+  width: 100%;
+  min-height: 54px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease;
 }
 
 .logoutButton:hover {
-    background: rgba(255, 80, 80, 0.08);
+  background: rgba(255, 80, 80, 0.08);
 }
 
 .logoutButton:focus-visible {
-    outline: 2px solid #5b79ff;
-    outline-offset: 2px;
+  outline: 2px solid #5b79ff;
+  outline-offset: 2px;
 }
 
 .logoutButtonCollapsed {
-    justify-content: center;
-    padding-inline: 8px;
+  justify-content: center;
+  padding-inline: 8px;
 }
 
 .logoutIcon {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .logoutLabel {
-    font-size: 0.98rem;
-    color: #2d2d2d;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
+  font-size: 0.98rem;
+  color: #2d2d2d;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 /* ─── Responsive (≤ 900px fuerza modo colapsado) ─────────────── */
 @media (max-width: 900px) {
-    .sidebar {
-        width: 72px;
-        padding-inline: 6px;
-    }
+  .sidebar {
+    width: 72px;
+    padding-inline: 6px;
+  }
 
-    .topRow {
-        justify-content: center;
-    }
+  .topRow {
+    justify-content: center;
+  }
 
-    .userBlock {
-        display: none;
-        /* oculto en modo colapsado responsive */
-    }
+  .userBlock {
+    display: none;
+    /* oculto en modo colapsado responsive */
+  }
 
-    .menuLabel,
-    .logoutLabel {
-        display: none;
-    }
+  .menuLabel,
+  .logoutLabel {
+    display: none;
+  }
 
-    .menuItem,
-    .logoutButton {
-        justify-content: center;
-        padding-inline: 8px;
-    }
+  .menuItem,
+  .logoutButton {
+    justify-content: center;
+    padding-inline: 8px;
+  }
 }
