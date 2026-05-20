@@ -10,3 +10,6 @@ release
 
 # Runtime secrets - never commit
 build/pos-runtime.env
+
+# Local audit / notes
+AUDIT.md
