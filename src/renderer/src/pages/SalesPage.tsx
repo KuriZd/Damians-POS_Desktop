@@ -64,9 +64,11 @@ type CartEntry = {
 
 // ─── Catalog loader ───────────────────────────────────────────────────────────
 
-async function loadCatalog(): Promise<CatalogItem[]> {
-  const items: CatalogItem[] = []
-  const pageSize = 500
+type CatalogBatchCallback = (batch: CatalogItem[], done: boolean) => void
+
+async function loadCatalog(onBatch: CatalogBatchCallback): Promise<void> {
+  const pageSize = 100
+  let loadOrder = 0
 
   try {
     let page = 1
@@ -76,20 +78,19 @@ async function loadCatalog(): Promise<CatalogItem[]> {
       const result = await window.pos.products.list({ page, pageSize, active: true })
       total = result.total
 
-      for (const p of result.items) {
-        items.push({
-          id: p.id,
-          publicId: p.publicId,
-          name: p.name,
-          price: p.price,
-          type: 'product',
-          stock: p.stock ?? undefined,
-          sku: p.sku,
-          barcode: p.barcode,
-          loadOrder: items.length
-        })
-      }
+      const batch: CatalogItem[] = result.items.map((p) => ({
+        id: p.id,
+        publicId: p.publicId,
+        name: p.name,
+        price: p.price,
+        type: 'product' as const,
+        stock: p.stock ?? undefined,
+        sku: p.sku,
+        barcode: p.barcode,
+        loadOrder: loadOrder++
+      }))
 
+      if (batch.length > 0) onBatch(batch, false)
       if (result.items.length === 0) break
       page += 1
     }
@@ -105,18 +106,17 @@ async function loadCatalog(): Promise<CatalogItem[]> {
       const result = await window.pos.services.list({ page, pageSize, active: true })
       total = result.total
 
-      for (const s of result.items) {
-        items.push({
-          id: s.id,
-          publicId: s.publicId ?? s.code,
-          name: s.name,
-          price: s.price,
-          type: 'service',
-          code: s.code,
-          loadOrder: items.length
-        })
-      }
+      const batch: CatalogItem[] = result.items.map((s) => ({
+        id: s.id,
+        publicId: s.publicId ?? s.code,
+        name: s.name,
+        price: s.price,
+        type: 'service' as const,
+        code: s.code,
+        loadOrder: loadOrder++
+      }))
 
+      if (batch.length > 0) onBatch(batch, false)
       if (result.items.length === 0) break
       page += 1
     }
@@ -124,7 +124,7 @@ async function loadCatalog(): Promise<CatalogItem[]> {
     /* sin servicios locales */
   }
 
-  return items
+  onBatch([], true)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1208,6 +1208,7 @@ function CorteModal({
 export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogLoadingMore, setCatalogLoadingMore] = useState(false)
   const [search, setSearch] = useState('')
   const [scanMode, setScanMode] = useState(false)
   const [filter, setFilter] = useState<FilterKey>('none')
@@ -1230,9 +1231,20 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   }, [toast])
 
   useEffect(() => {
-    void loadCatalog().then((items) => {
-      setCatalog(items)
-      setCatalogLoading(false)
+    let firstBatch = true
+    void loadCatalog((batch, done) => {
+      if (batch.length > 0) {
+        setCatalog((prev) => [...prev, ...batch])
+        if (firstBatch) {
+          setCatalogLoading(false)
+          setCatalogLoadingMore(true)
+          firstBatch = false
+        }
+      }
+      if (done) {
+        setCatalogLoading(false)
+        setCatalogLoadingMore(false)
+      }
     })
   }, [])
 
@@ -1498,6 +1510,12 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
               {filtered.map((item) => (
                 <ProductCard key={`${item.type}-${item.id}`} item={item} onAdd={addToCart} />
               ))}
+              {catalogLoadingMore && (
+                <div className={styles.loadingMoreRow}>
+                  <FiRefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Cargando más…</span>
+                </div>
+              )}
             </div>
           )}
         </section>
