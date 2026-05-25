@@ -1461,7 +1461,11 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   // ── Totals ───────────────────────────────────────────────────
 
   const subtotal = useMemo(() => cart.reduce((acc, e) => acc + e.price * e.qty, 0), [cart])
-  const total = useMemo(() => subtotal - discount, [subtotal, discount])
+  const total = useMemo(() => Math.max(0, subtotal - discount), [subtotal, discount])
+
+  useEffect(() => {
+    if (discount > subtotal) setDiscount(subtotal)
+  }, [discount, subtotal])
 
   // ── Keyboard shortcut: Escape clears search ──────────────────
   const handleSearchKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
@@ -1532,8 +1536,10 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     if (!result.ok) {
       if (result.error === 'STOCK_INSUFICIENTE' && result.items && result.items.length > 0) {
         const detail = result.items
-          .map((i: { name: string; available: number; requested: number }) =>
-            `${i.name} (disponible: ${i.available}, solicitado: ${i.requested})`)
+          .map(
+            (i: { name: string; available: number; requested: number }) =>
+              `${i.name} (disponible: ${i.available}, solicitado: ${i.requested})`
+          )
           .join('; ')
         throw new Error(`Stock insuficiente — ${detail}`)
       }
@@ -1595,11 +1601,11 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
       if (TERMINAL_FAILED.includes(status)) {
         stopTerminalPoll()
-        setTerminalIntent((prev) => prev ? { ...prev, status } : null)
+        setTerminalIntent((prev) => (prev ? { ...prev, status } : null))
         return
       }
 
-      setTerminalIntent((prev) => prev ? { ...prev, status } : null)
+      setTerminalIntent((prev) => (prev ? { ...prev, status } : null))
     }, 3000)
   }
 
@@ -1619,6 +1625,10 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
   const handleCharge = useCallback(async () => {
     if (cart.length === 0 || charging) return
+    if (total <= 0) {
+      setToast({ type: 'error', message: 'El total debe ser mayor a $0.00.' })
+      return
+    }
     setCharging(true)
     try {
       if (payMethod === 'tarjeta') {
@@ -1634,7 +1644,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     } finally {
       if (payMethod !== 'tarjeta') setCharging(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart, charging, user.id, discount, total, payMethod, cashReceived, clearCart])
 
   // ── Render ───────────────────────────────────────────────────
@@ -1647,7 +1657,9 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
           total={terminalIntent.amount}
           status={terminalIntent.status}
           paymentApproved={terminalIntent.paymentApproved}
-          onCancel={() => { void handleCancelTerminal() }}
+          onCancel={() => {
+            void handleCancelTerminal()
+          }}
           onClose={handleCloseTerminalModal}
         />
       )}
@@ -1801,7 +1813,10 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
                   className={styles.discountToggle}
                   onClick={() => {
                     const v = prompt('Descuento en pesos:', (discount / 100).toFixed(2))
-                    if (v !== null) setDiscount(Math.max(0, Math.round((parseFloat(v) || 0) * 100)))
+                    if (v !== null) {
+                      const cents = Math.max(0, Math.round((parseFloat(v) || 0) * 100))
+                      setDiscount(Math.min(cents, subtotal))
+                    }
                   }}
                 >
                   Editar

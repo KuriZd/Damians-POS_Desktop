@@ -54,6 +54,8 @@ type ServiceSupplySnap = {
   qty: number
 }
 
+type StockRequirement = { sku: string; name: string; needed: number }
+
 function movementDir(sourceType: string): 'IN' | 'OUT' {
   switch (sourceType) {
     case 'PURCHASE':
@@ -107,8 +109,24 @@ export function createSale(
       return { ok: false, error: 'PAYLOAD_INVALIDO: qty debe ser entero positivo' }
     if (!Number.isInteger(item.price) || item.price < 0)
       return { ok: false, error: 'PAYLOAD_INVALIDO: price debe ser entero no negativo' }
+    if (!Number.isInteger(item.discount) || item.discount < 0)
+      return { ok: false, error: 'PAYLOAD_INVALIDO: discount debe ser entero no negativo' }
     if (!Number.isInteger(item.lineTotal) || item.lineTotal < 0)
       return { ok: false, error: 'PAYLOAD_INVALIDO: lineTotal debe ser entero no negativo' }
+    if (item.lineTotal !== item.price * item.qty)
+      return { ok: false, error: 'PAYLOAD_INVALIDO: lineTotal no coincide con price * qty' }
+    if (item.discount > item.lineTotal)
+      return { ok: false, error: 'PAYLOAD_INVALIDO: discount no puede exceder lineTotal' }
+    if (item.itemType.toUpperCase() === 'PRODUCT' && !item.productPublicId)
+      return { ok: false, error: 'PAYLOAD_INVALIDO: productPublicId requerido' }
+    if (item.itemType.toUpperCase() === 'SERVICE' && !item.servicePublicId)
+      return { ok: false, error: 'PAYLOAD_INVALIDO: servicePublicId requerido' }
+  }
+  if (
+    payload.discount !== undefined &&
+    (!Number.isInteger(payload.discount) || payload.discount < 0)
+  ) {
+    return { ok: false, error: 'PAYLOAD_INVALIDO: discount global debe ser entero no negativo' }
   }
   if (!Array.isArray(payload.payments) || payload.payments.length === 0)
     return { ok: false, error: 'PAGO_REQUERIDO: se requiere al menos un método de pago' }
@@ -143,7 +161,7 @@ export function createSale(
                c.name AS categoryName
         FROM "Product" p
         LEFT JOIN "Category" c ON c.id = p."categoryId"
-        WHERE p."publicId" = ? LIMIT 1
+        WHERE p."publicId" = ? AND p.active = 1 AND p."deletedAt" IS NULL LIMIT 1
       `
         )
         .get(item.productPublicId) as ProductSnap | undefined
@@ -154,7 +172,7 @@ export function createSale(
         .prepare(
           `
         SELECT id, code, name, cost, "taxRateBp", "profitPctBp"
-        FROM "Service" WHERE "publicId" = ? LIMIT 1
+        FROM "Service" WHERE "publicId" = ? AND active = 1 AND "deletedAt" IS NULL LIMIT 1
       `
         )
         .get(item.servicePublicId) as ServiceSnap | undefined
@@ -199,6 +217,15 @@ export function createSale(
         : item.servicePublicId
           ? serviceSnaps.get(item.servicePublicId)
           : undefined
+    if (!snap) {
+      return {
+        ok: false,
+        error:
+          type === 'PRODUCT'
+            ? 'PRODUCTO_NO_DISPONIBLE: no se encontrÃ³ el producto activo'
+            : 'SERVICIO_NO_DISPONIBLE: no se encontrÃ³ el servicio activo'
+      }
+    }
     const lineSubtotal = item.lineTotal - (item.discount ?? 0)
     const lineTax = 0
     const lineCostTotal = (snap?.cost ?? 0) * item.qty
@@ -208,26 +235,42 @@ export function createSale(
   }
 
   const saleTotal = saleSubtotal - (payload.discount ?? 0)
+  if (saleTotal <= 0) return { ok: false, error: 'TOTAL_INVALIDO: el total debe ser positivo' }
 
   // ── Stock guard ─────────────────────────────────────────────────────────
-  const requiredQtyMap = new Map<number, { psnap: ProductSnap; needed: number }>()
+  const requiredQtyMap = new Map<number, StockRequirement>()
+  const addStockRequirement = (
+    productId: number,
+    itemInfo: { sku: string; name: string },
+    needed: number
+  ): void => {
+    const entry = requiredQtyMap.get(productId)
+    if (entry) entry.needed += needed
+    else requiredQtyMap.set(productId, { sku: itemInfo.sku, name: itemInfo.name, needed })
+  }
+
   for (const { type, snap, item } of lines) {
-    if (type !== 'PRODUCT' || !snap) continue
-    const psnap = snap as ProductSnap
-    const entry = requiredQtyMap.get(psnap.id)
-    if (entry) entry.needed += item.qty
-    else requiredQtyMap.set(psnap.id, { psnap, needed: item.qty })
+    if (type === 'PRODUCT') {
+      const psnap = snap as ProductSnap
+      addStockRequirement(psnap.id, psnap, item.qty)
+      continue
+    }
+
+    const supplyRows = item.servicePublicId ? (serviceSupplies.get(item.servicePublicId) ?? []) : []
+    for (const supply of supplyRows) {
+      addStockRequirement(supply.productId, supply, item.qty * supply.qty)
+    }
   }
   const stockErrors: StockErrorItem[] = []
-  for (const [productId, { psnap, needed }] of requiredQtyMap) {
+  for (const [productId, requirement] of requiredQtyMap) {
     const row = db.prepare(`SELECT stock FROM "Product" WHERE id = ?`).get(productId) as {
       stock: number
     }
-    if (row.stock < needed)
+    if (row.stock < requirement.needed)
       stockErrors.push({
-        sku: psnap.sku,
-        name: psnap.name,
-        requested: needed,
+        sku: requirement.sku,
+        name: requirement.name,
+        requested: requirement.needed,
         available: row.stock
       })
   }

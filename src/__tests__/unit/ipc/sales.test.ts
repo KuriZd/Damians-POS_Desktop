@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type BetterSqlite3 from 'better-sqlite3'
 import { createTestDb } from '../../helpers/test-db'
-import { seedProduct, seedUser } from '../../helpers/seeds'
+import { seedProduct, seedService, seedServiceSupply, seedUser } from '../../helpers/seeds'
 import { createSale } from '../../../main/ipc/sales.core'
 import type { CreateSalePayload, SaleItemInput } from '../../../main/ipc/sales.core'
 
@@ -14,6 +14,18 @@ function makeItem(publicId: string, qty: number, price: number): SaleItemInput {
     itemType: 'PRODUCT' as const,
     productPublicId: publicId,
     servicePublicId: null,
+    qty,
+    price,
+    discount: 0,
+    lineTotal: price * qty
+  }
+}
+
+function makeServiceItem(publicId: string, qty: number, price: number): SaleItemInput {
+  return {
+    itemType: 'SERVICE' as const,
+    productPublicId: null,
+    servicePublicId: publicId,
     qty,
     price,
     discount: 0,
@@ -119,6 +131,26 @@ describe('sales:create — stock guard', () => {
       stock: number
     }
     expect(row.stock).toBe(5)
+  })
+
+  it('rejects service sale when supply stock is insufficient', () => {
+    const supply = seedProduct(db, { stock: 2, price: 1000, cost: 100 })
+    const service = seedService(db, { price: 500 })
+    seedServiceSupply(db, service.id, supply.id, 2)
+
+    const result = createSale(
+      db,
+      makePayload({
+        items: [makeServiceItem(service.publicId, 2, 500)],
+        payments: [{ method: 'efectivo', amount: 1000 }]
+      })
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toBe('STOCK_INSUFICIENTE')
+    expect(result.items![0].requested).toBe(4)
+    expect(result.items![0].available).toBe(2)
   })
 })
 
@@ -235,5 +267,19 @@ describe('sales:create — structural payload validation', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error).toContain('price')
+  })
+
+  it('rejects missing product references', () => {
+    const result = createSale(db, makePayload({ items: [makeItem('missing-product', 1, 1000)] }))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('PRODUCTO_NO_DISPONIBLE')
+  })
+
+  it('rejects discounts that make the sale total non-positive', () => {
+    const result = createSale(db, makePayload({ discount: 1000 }))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('TOTAL_INVALIDO')
   })
 })

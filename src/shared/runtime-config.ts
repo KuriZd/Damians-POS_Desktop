@@ -40,10 +40,17 @@ function loadRuntimeEnv(): RuntimeEnvResult {
     if (!existingFile(filePath)) continue
 
     const fileContent = fs.readFileSync(filePath, 'utf8')
-    return {
-      values: parseDotenv(fileContent),
-      source: filePath
+    const values = parseDotenv(fileContent)
+
+    // Apply all file values to process.env so any IPC handler can read them
+    // directly via process.env. File values never override existing env vars.
+    for (const [key, value] of Object.entries(values)) {
+      if (process.env[key] === undefined) {
+        process.env[key] = value
+      }
     }
+
+    return { values, source: filePath }
   }
 
   return {
@@ -56,13 +63,13 @@ function requiredValue(
   name: 'SUPABASE_URL' | 'SUPABASE_ANON_KEY',
   fileValues: Record<string, string>
 ): string {
-  const value =
-    process.env[name] ??
-    fileValues[name] ??
-    (name === 'SUPABASE_URL'
-      ? process.env.VITE_SUPABASE_URL
-      : process.env.VITE_SUPABASE_ANON_KEY) ??
-    (name === 'SUPABASE_URL' ? fileValues.VITE_SUPABASE_URL : fileValues.VITE_SUPABASE_ANON_KEY)
+  const fallbackName = name === 'SUPABASE_URL' ? 'VITE_SUPABASE_URL' : 'VITE_SUPABASE_ANON_KEY'
+  const value = [
+    process.env[name],
+    fileValues[name],
+    process.env[fallbackName],
+    fileValues[fallbackName]
+  ].find((candidate) => isConfiguredValue(name, candidate))
 
   if (!value) {
     console.warn(
@@ -72,6 +79,22 @@ function requiredValue(
   }
 
   return value
+}
+
+function isConfiguredValue(
+  name: 'SUPABASE_URL' | 'SUPABASE_ANON_KEY',
+  value: string | undefined
+): value is string {
+  if (!value) return false
+
+  const trimmed = value.trim()
+  if (!trimmed) return false
+
+  if (name === 'SUPABASE_URL') {
+    return !/^https:\/\/(your-project-id|tu-proyecto)\.supabase\.co$/i.test(trimmed)
+  }
+
+  return !/^tu-|^your-/i.test(trimmed) && trimmed !== 'placeholder'
 }
 
 let cachedConfig: RuntimeConfig | null = null

@@ -64,7 +64,7 @@
 }
 
 /* Móvil: bottom-sheet compacto */
-@media (max-width: 260px) {
+@media (max-width: 520px) {
   .menu {
     position: fixed !important;
     left: 10px !important;

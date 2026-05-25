@@ -89,13 +89,25 @@ export function registerSalesIpc(): void {
         s.id, s.folio, s."createdAt" AS createdAt,
         s.total, s.subtotal, s.status,
         u.name          AS cashierName,
-        COUNT(si.id)    AS itemCount,
-        p.method        AS paymentMethod
+        COALESCE(items.itemCount, 0) AS itemCount,
+        COALESCE(payments.paymentMethod, 'â€”') AS paymentMethod
       FROM "Sale" s
       LEFT JOIN "User"     u  ON u.id  = s."cashierId"
-      LEFT JOIN "SaleItem" si ON si."salePublicId" = s."publicId"
-      LEFT JOIN "Payment"  p  ON p."salePublicId"  = s."publicId"
-      GROUP BY s.id
+      LEFT JOIN (
+        SELECT "salePublicId", COUNT(*) AS itemCount
+        FROM "SaleItem"
+        GROUP BY "salePublicId"
+      ) items ON items."salePublicId" = s."publicId"
+      LEFT JOIN (
+        SELECT
+          "salePublicId",
+          CASE
+            WHEN COUNT(*) > 1 THEN 'mixto'
+            ELSE MAX(method)
+          END AS paymentMethod
+        FROM "Payment"
+        GROUP BY "salePublicId"
+      ) payments ON payments."salePublicId" = s."publicId"
       ORDER BY s."createdAt" DESC
       LIMIT ?
     `

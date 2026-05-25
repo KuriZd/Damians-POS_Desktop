@@ -39,6 +39,57 @@ export function seedProduct(
   return { id: Number(info.lastInsertRowid), publicId }
 }
 
+export type ServiceSeed = {
+  id?: number
+  publicId?: string
+  code?: string
+  name?: string
+  price?: number
+  cost?: number
+  active?: number
+}
+
+export function seedService(
+  db: BetterSqlite3.Database,
+  overrides: ServiceSeed = {}
+): { id: number; publicId: string } {
+  const publicId = overrides.publicId ?? randomUUID()
+  const now = new Date().toISOString()
+  const info = db
+    .prepare(
+      `
+    INSERT INTO "Service" ("publicId", code, name, price, cost, active, "createdAt", "updatedAt")
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `
+    )
+    .run(
+      publicId,
+      overrides.code ?? `SVC-${Date.now()}`,
+      overrides.name ?? 'Servicio test',
+      overrides.price ?? 1000,
+      overrides.cost ?? 0,
+      overrides.active ?? 1,
+      now,
+      now
+    )
+  return { id: Number(info.lastInsertRowid), publicId }
+}
+
+export function seedServiceSupply(
+  db: BetterSqlite3.Database,
+  serviceId: number,
+  productId: number,
+  qty: number
+): void {
+  const now = new Date().toISOString()
+  db.prepare(
+    `
+    INSERT INTO "ServiceSupply" ("serviceId", "productId", qty, "createdAt", "updatedAt")
+    VALUES (?, ?, ?, ?, ?)
+  `
+  ).run(serviceId, productId, qty, now, now)
+}
+
 export type UserSeed = {
   id?: number
   username?: string

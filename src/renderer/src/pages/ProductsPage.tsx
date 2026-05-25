@@ -322,10 +322,11 @@ export default function ProductsView(): JSX.Element {
   useEffect(() => {
     setFiltersOpen(false)
 
-    if (mode === 'services' && filterKey === 'stock') {
-      setFilterKey('alpha')
-    }
-  }, [mode, filterKey])
+    setFilterKey((current) => {
+      if (mode === 'services' && current === 'stock') return 'alpha'
+      return current
+    })
+  }, [mode])
 
   async function fetchProductsList(
     nextPage = page,
