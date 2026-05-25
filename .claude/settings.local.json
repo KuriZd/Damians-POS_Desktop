@@ -19,7 +19,8 @@
       "Bash(npm install *)",
       "Bash(npm test *)",
       "Bash(grep -E \"^C:.*\\\\.\\(ts|tsx\\)$|^\\\\s+\\\\d+:\\\\d+\\\\s+error\")",
-      "Bash(awk '/^C:.*\\\\.\\(ts|tsx\\)$/{file=$0} /error.*explicit-function-return-type|error.*Compilation Skipped/{print file\": \"$0}')"
+      "Bash(awk '/^C:.*\\\\.\\(ts|tsx\\)$/{file=$0} /error.*explicit-function-return-type|error.*Compilation Skipped/{print file\": \"$0}')",
+      "Bash(curl *)"
     ]
   }
 }

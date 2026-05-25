@@ -51,6 +51,14 @@ contextBridge.exposeInMainWorld('pos', {
       ipcRenderer.invoke('sales:confirmCorte', cashierId, countedCash),
     cashMovement: (payload: unknown) => ipcRenderer.invoke('sales:cashMovement', payload)
   },
+  mercadopago: {
+    createPaymentIntent: (amount: number, externalRef: string) =>
+      ipcRenderer.invoke('mp:createPaymentIntent', amount, externalRef),
+    getPaymentIntent: (intentId: string) =>
+      ipcRenderer.invoke('mp:getPaymentIntent', intentId),
+    cancelPaymentIntent: (intentId: string) =>
+      ipcRenderer.invoke('mp:cancelPaymentIntent', intentId)
+  },
   sync: {
     pullProducts: () => ipcRenderer.invoke('sync:pullProducts'),
     pullAll: () => ipcRenderer.invoke('sync:pullAll'),

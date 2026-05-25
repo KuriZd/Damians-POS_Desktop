@@ -10,6 +10,7 @@ import { registerAuthIpc, clearSession } from './ipc/auth.ipc'
 import { registerUsersIpc } from './ipc/users.ipc'
 import { registerInventoryIpc } from './ipc/inventory.ipc'
 import { registerDashboardIpc } from './ipc/dashboard.ipc'
+import { registerMercadoPagoIpc } from './ipc/mercadopago.ipc'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -74,6 +75,7 @@ app.whenReady().then(() => {
   registerSyncIpc()
   registerInventoryIpc()
   registerDashboardIpc()
+  registerMercadoPagoIpc()
   createWindow()
 })
 
