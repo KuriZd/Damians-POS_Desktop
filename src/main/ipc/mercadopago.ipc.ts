@@ -34,7 +34,13 @@ function mpRequest<T>(
       res.on('data', (chunk: Buffer) => { data += chunk.toString() })
       res.on('end', () => {
         try {
-          resolve(JSON.parse(data) as T)
+          const parsed = JSON.parse(data) as T & { status?: number; error?: string; message?: string }
+          const status = res.statusCode ?? 0
+          if (status < 200 || status >= 300) {
+            reject(new Error(`MP ${status}: ${parsed.message ?? parsed.error ?? data}`))
+            return
+          }
+          resolve(parsed)
         } catch {
           reject(new Error(`Respuesta invalida de MP: ${data}`))
         }
@@ -53,9 +59,10 @@ type PaymentIntentResponse = {
   amount: number
   state?: string
   payment?: {
-    id: number
-    state: string
-    type: string
+    id: number | string
+    installments?: number
+    type?: string
+    state?: string
   }
 }
 
@@ -63,6 +70,7 @@ export function registerMercadoPagoIpc(): void {
   ipcMain.handle('mp:createPaymentIntent', async (_e, amount: number, externalRef: string) => {
     try {
       const { token, deviceId } = getCredentials()
+      console.log('[MP] createPaymentIntent - device:', deviceId, 'amount:', amount)
       const result = await mpRequest<PaymentIntentResponse>(
         'POST',
         `/point/integration-api/devices/${encodeURIComponent(deviceId)}/payment-intents`,
@@ -71,13 +79,14 @@ export function registerMercadoPagoIpc(): void {
           amount,
           additional_info: {
             external_reference: externalRef,
-            print_on_terminal: true,
-            ticket_number: externalRef
+            print_on_terminal: true
           }
         }
       )
+      console.log('[MP] createPaymentIntent response:', JSON.stringify(result))
       return { ok: true, id: result.id }
     } catch (err) {
+      console.error('[MP] createPaymentIntent error:', err)
       return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
     }
   })
@@ -90,8 +99,10 @@ export function registerMercadoPagoIpc(): void {
         `/point/integration-api/payment-intents/${intentId}`,
         token
       )
+      console.log('[MP] getPaymentIntent:', intentId, '-> state:', result.state, '| payment:', JSON.stringify(result.payment ?? null))
       return { ok: true, state: result.state, payment: result.payment ?? null }
     } catch (err) {
+      console.error('[MP] getPaymentIntent error:', err)
       return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
     }
   })

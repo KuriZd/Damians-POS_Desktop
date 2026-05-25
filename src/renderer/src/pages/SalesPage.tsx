@@ -634,9 +634,15 @@ function TerminalPaymentModal({
   const isFailed = TERMINAL_FAILED.includes(status)
   const isSuccess = status === 'FINISHED' && paymentApproved
 
+  useEffect(() => {
+    if (!isSuccess) return
+    const t = setTimeout(onClose, 10_000)
+    return () => clearTimeout(t)
+  }, [isSuccess, onClose])
+
   return (
-    <div className={styles.modalOverlay}>
-      <div className={`${styles.modalBox} ${styles.terminalBox}`}>
+    <div className={styles.modalOverlay} onClick={isSuccess ? onClose : undefined}>
+      <div className={`${styles.modalBox} ${styles.terminalBox}`} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div className={styles.modalTitle}>Pago con terminal</div>
         </div>
@@ -1326,6 +1332,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   const [corteOpen, setCorteOpen] = useState(false)
   const [terminalIntent, setTerminalIntent] = useState<{
     id: string
+    amount: number
     status: TerminalStatus
     paymentApproved: boolean
   } | null>(null)
@@ -1355,6 +1362,10 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
         setCatalogLoadingMore(false)
       }
     })
+  }, [])
+
+  useEffect(() => {
+    return () => stopTerminalPoll()
   }, [])
 
   // ── Catalog filtering ────────────────────────────────────────
@@ -1534,6 +1545,11 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   }
 
   async function handleTerminalCharge(): Promise<void> {
+    if (total < 500) {
+      setToast({ type: 'error', message: 'El monto minimo para cobro con terminal es $5.00' })
+      setCharging(false)
+      return
+    }
     const externalRef = `POS-${Date.now()}`
     const intentResult = await window.pos.mercadopago.createPaymentIntent(total, externalRef)
     if (!intentResult.ok) {
@@ -1542,18 +1558,28 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
     }
 
     const intentId = intentResult.id
-    setTerminalIntent({ id: intentId, status: 'OPEN', paymentApproved: false })
+    setTerminalIntent({ id: intentId, amount: total, status: 'OPEN', paymentApproved: false })
 
     terminalPollRef.current = setInterval(async () => {
       const poll = await window.pos.mercadopago.getPaymentIntent(intentId)
-      if (!poll.ok) return
+      if (!poll.ok) {
+        stopTerminalPoll()
+        setTerminalIntent((prev) => (prev ? { ...prev, status: 'ERROR' } : null))
+        setToast({ type: 'error', message: `Error terminal: ${poll.error}` })
+        return
+      }
 
       const status = (poll.state ?? 'OPEN') as TerminalStatus
 
       if (status === 'FINISHED') {
         stopTerminalPoll()
-        const approved = poll.payment?.state === 'APPROVED'
-        setTerminalIntent({ id: intentId, status: 'FINISHED', paymentApproved: approved })
+        const approved = poll.payment?.id != null
+        setTerminalIntent({
+          id: intentId,
+          amount: total,
+          status: 'FINISHED',
+          paymentApproved: approved
+        })
         if (approved) {
           try {
             await registerSale([{ method: 'tarjeta', amount: total }])
@@ -1618,7 +1644,7 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
       {terminalIntent && (
         <TerminalPaymentModal
           intentId={terminalIntent.id}
-          total={total}
+          total={terminalIntent.amount}
           status={terminalIntent.status}
           paymentApproved={terminalIntent.paymentApproved}
           onCancel={() => { void handleCancelTerminal() }}
