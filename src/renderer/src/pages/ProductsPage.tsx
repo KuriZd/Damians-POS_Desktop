@@ -735,7 +735,11 @@ export default function ProductsView(): JSX.Element {
           </div>
         )}
 
-        <div className={styles.tableWrap}>
+        <div
+          className={`${styles.tableWrap} ${
+            currentData.pageSize >= 20 ? styles.tableWrapScrollable : ''
+          }`}
+        >
           {mode === 'products' ? (
             <div className={styles.tableHeader}>
               <div>#</div>
