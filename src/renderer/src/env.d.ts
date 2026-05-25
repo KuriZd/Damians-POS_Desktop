@@ -260,5 +260,27 @@ interface Window {
       conflicts: () => Promise<SyncConflict[]>
       diagnose: () => Promise<DiagnosticResult>
     }
+    mercadopago: {
+      createPaymentIntent: (
+        amount: number,
+        externalRef: string
+      ) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
+      getPaymentIntent: (intentId: string) => Promise<
+        | {
+            ok: true
+            state: string | undefined
+            payment: {
+              id: number | string
+              installments?: number
+              type?: string
+              state?: string
+            } | null
+          }
+        | { ok: false; error: string }
+      >
+      cancelPaymentIntent: (
+        intentId: string
+      ) => Promise<{ ok: true } | { ok: false; error: string }>
+    }
   }
 }

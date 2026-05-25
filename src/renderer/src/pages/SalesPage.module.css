@@ -1699,3 +1699,73 @@
   font-weight: 700;
   color: #1a2340;
 }
+
+/* ─── Terminal Payment Modal ─────────────────────────────────────────────── */
+
+.terminalBox {
+  width: 360px;
+  text-align: center;
+}
+
+.terminalBody {
+  padding: 32px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.terminalAmount {
+  font-size: 36px;
+  font-weight: 800;
+  color: #1a2340;
+  letter-spacing: -1px;
+}
+
+.terminalWaiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #5b79ff;
+}
+
+.terminalStatusLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a2340;
+  margin: 0;
+}
+
+.terminalHint {
+  font-size: 12px;
+  color: #8a94b0;
+  margin: 0;
+}
+
+.terminalSuccess {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.terminalFailed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.terminalFailedIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

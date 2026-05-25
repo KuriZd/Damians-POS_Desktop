@@ -57,5 +57,13 @@ contextBridge.exposeInMainWorld('pos', {
     pushPending: () => ipcRenderer.invoke('sync:pushPending'),
     conflicts: () => ipcRenderer.invoke('sync:conflicts'),
     diagnose: () => ipcRenderer.invoke('sync:diagnose')
+  },
+  mercadopago: {
+    createPaymentIntent: (amount: number, externalRef: string) =>
+      ipcRenderer.invoke('mp:createPaymentIntent', amount, externalRef),
+    getPaymentIntent: (intentId: string) =>
+      ipcRenderer.invoke('mp:getPaymentIntent', intentId),
+    cancelPaymentIntent: (intentId: string) =>
+      ipcRenderer.invoke('mp:cancelPaymentIntent', intentId)
   }
 })

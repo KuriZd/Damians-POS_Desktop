@@ -588,6 +588,115 @@ function PaymentSection({
   )
 }
 
+// ─── Terminal Payment Modal ──────────────────────────────────────────────────
+
+type TerminalStatus =
+  | 'OPEN'
+  | 'ON_TERMINAL'
+  | 'PROCESSING'
+  | 'PROCESSED'
+  | 'FINISHED'
+  | 'CANCELED'
+  | 'ERROR'
+  | 'ABANDONED'
+
+const TERMINAL_STATUS_LABEL: Record<TerminalStatus, string> = {
+  OPEN: 'Enviando al terminal…',
+  ON_TERMINAL: 'Esperando pago en el terminal…',
+  PROCESSING: 'Procesando pago…',
+  PROCESSED: 'Confirmando…',
+  FINISHED: '¡Pago aprobado!',
+  CANCELED: 'Pago cancelado',
+  ERROR: 'Error en el terminal',
+  ABANDONED: 'Tiempo agotado'
+}
+
+const TERMINAL_PENDING: TerminalStatus[] = ['OPEN', 'ON_TERMINAL', 'PROCESSING', 'PROCESSED']
+const TERMINAL_FAILED: TerminalStatus[] = ['CANCELED', 'ERROR', 'ABANDONED']
+
+type TerminalPaymentModalProps = {
+  intentId: string
+  total: number
+  status: TerminalStatus
+  paymentApproved: boolean
+  onCancel: () => void
+  onClose: () => void
+}
+
+function TerminalPaymentModal({
+  total,
+  status,
+  paymentApproved,
+  onCancel,
+  onClose
+}: TerminalPaymentModalProps): ReactElement {
+  const isPending = TERMINAL_PENDING.includes(status)
+  const isFailed = TERMINAL_FAILED.includes(status)
+  const isSuccess = status === 'FINISHED' && paymentApproved
+
+  useEffect(() => {
+    if (!isSuccess) return
+    const t = setTimeout(onClose, 10_000)
+    return () => clearTimeout(t)
+  }, [isSuccess, onClose])
+
+  return (
+    <div className={styles.modalOverlay} onClick={isSuccess ? onClose : undefined}>
+      <div className={`${styles.modalBox} ${styles.terminalBox}`} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div className={styles.modalTitle}>Pago con terminal</div>
+        </div>
+
+        <div className={styles.terminalBody}>
+          <div className={styles.terminalAmount}>{fmt(total)}</div>
+
+          {isPending && (
+            <div className={styles.terminalWaiting}>
+              <FiRefreshCw size={28} style={{ animation: 'spin 1s linear infinite' }} />
+              <p className={styles.terminalStatusLabel}>{TERMINAL_STATUS_LABEL[status]}</p>
+              <p className={styles.terminalHint}>El cliente debe acercar o insertar su tarjeta</p>
+            </div>
+          )}
+
+          {isSuccess && (
+            <div className={styles.terminalSuccess}>
+              <div className={styles.corteSuccessIcon}>✓</div>
+              <p className={styles.terminalStatusLabel}>Pago aprobado</p>
+            </div>
+          )}
+
+          {isFailed && (
+            <div className={styles.terminalFailed}>
+              <div className={styles.terminalFailedIcon}>✕</div>
+              <p className={styles.terminalStatusLabel}>{TERMINAL_STATUS_LABEL[status]}</p>
+            </div>
+          )}
+
+          {status === 'FINISHED' && !paymentApproved && (
+            <div className={styles.terminalFailed}>
+              <div className={styles.terminalFailedIcon}>✕</div>
+              <p className={styles.terminalStatusLabel}>Pago rechazado por el banco</p>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.corteFooter}>
+          {isPending && (
+            <button className={styles.corteCancelBtn} onClick={onCancel}>
+              Cancelar cobro
+            </button>
+          )}
+          {(isFailed || (status === 'FINISHED' && !paymentApproved)) && (
+            <button className={styles.corteCloseBtn} onClick={onClose}>
+              Cerrar
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Historial Modal ─────────────────────────────────────────────────────────
 
 const METHOD_LABEL: Record<string, string> = {
@@ -1220,6 +1329,12 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
   const [charging, setCharging] = useState(false)
   const [historialOpen, setHistorialOpen] = useState(false)
   const [corteOpen, setCorteOpen] = useState(false)
+  const [terminalIntent, setTerminalIntent] = useState<{
+    id: string
+    status: TerminalStatus
+    paymentApproved: boolean
+  } | null>(null)
+  const terminalPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -1375,51 +1490,146 @@ export default function SalesPage({ user }: { user: AuthUser }): ReactElement {
 
   useBarcodeScanner(handleSalesScan)
 
+  function stopTerminalPoll(): void {
+    if (terminalPollRef.current) {
+      clearInterval(terminalPollRef.current)
+      terminalPollRef.current = null
+    }
+  }
+
+  async function registerSale(payments: Array<{ method: string; amount: number }>): Promise<void> {
+    const result = await window.pos.sales.create({
+      cashierId: user.id,
+      items: cart.map((e) => ({
+        itemType: e.type,
+        productPublicId: e.type === 'product' ? e.publicId : null,
+        servicePublicId: e.type === 'service' ? e.publicId : null,
+        qty: e.qty,
+        price: e.price,
+        discount: 0,
+        lineTotal: e.price * e.qty
+      })),
+      discount,
+      payments
+    })
+    if (!result.ok) {
+      if (result.error === 'STOCK_INSUFICIENTE' && result.items && result.items.length > 0) {
+        const detail = result.items
+          .map((i: { name: string; available: number; requested: number }) =>
+            `${i.name} (disponible: ${i.available}, solicitado: ${i.requested})`)
+          .join('; ')
+        throw new Error(`Stock insuficiente — ${detail}`)
+      }
+      if (result.error === 'PAGO_INSUFICIENTE') throw new Error('El pago no cubre el total.')
+      throw new Error(`Error al registrar venta: ${result.error}`)
+    }
+    clearCart()
+    setToast({ type: 'success', message: `Venta ${result.folio} registrada por ${fmt(total)}` })
+  }
+
+  async function handleTerminalCharge(): Promise<void> {
+    if (total < 500) {
+      setToast({ type: 'error', message: 'El monto mínimo para cobro con terminal es $5.00' })
+      setCharging(false)
+      return
+    }
+    const externalRef = `POS-${Date.now()}`
+    const intentResult = await window.pos.mercadopago.createPaymentIntent(total, externalRef)
+    if (!intentResult.ok) {
+      setToast({ type: 'error', message: `No se pudo enviar al terminal: ${intentResult.error}` })
+      setCharging(false)
+      return
+    }
+
+    const intentId = intentResult.id
+    setTerminalIntent({ id: intentId, status: 'OPEN', paymentApproved: false })
+
+    terminalPollRef.current = setInterval(async () => {
+      const poll = await window.pos.mercadopago.getPaymentIntent(intentId)
+      if (!poll.ok) {
+        stopTerminalPoll()
+        setTerminalIntent((prev) => prev ? { ...prev, status: 'ERROR' } : null)
+        setToast({ type: 'error', message: `Error terminal: ${poll.error}` })
+        return
+      }
+
+      const status = (poll.state ?? 'OPEN') as TerminalStatus
+
+      if (status === 'FINISHED') {
+        stopTerminalPoll()
+        const approved = poll.payment?.id != null
+        setTerminalIntent({ id: intentId, status: 'FINISHED', paymentApproved: approved })
+        if (approved) {
+          try {
+            await registerSale([{ method: 'tarjeta', amount: total }])
+          } catch (err) {
+            setToast({
+              type: 'error',
+              message: err instanceof Error ? err.message : 'Error al registrar venta'
+            })
+          }
+        }
+        return
+      }
+
+      if (TERMINAL_FAILED.includes(status)) {
+        stopTerminalPoll()
+        setTerminalIntent((prev) => prev ? { ...prev, status } : null)
+        return
+      }
+
+      setTerminalIntent((prev) => prev ? { ...prev, status } : null)
+    }, 3000)
+  }
+
+  async function handleCancelTerminal(): Promise<void> {
+    if (!terminalIntent) return
+    stopTerminalPoll()
+    await window.pos.mercadopago.cancelPaymentIntent(terminalIntent.id)
+    setTerminalIntent(null)
+    setCharging(false)
+  }
+
+  function handleCloseTerminalModal(): void {
+    stopTerminalPoll()
+    setTerminalIntent(null)
+    setCharging(false)
+  }
+
   const handleCharge = useCallback(async () => {
     if (cart.length === 0 || charging) return
     setCharging(true)
     try {
-      const result = await window.pos.sales.create({
-        cashierId: user.id,
-        items: cart.map((e) => ({
-          itemType: e.type,
-          productPublicId: e.type === 'product' ? e.publicId : null,
-          servicePublicId: e.type === 'service' ? e.publicId : null,
-          qty: e.qty,
-          price: e.price,
-          discount: 0,
-          lineTotal: e.price * e.qty
-        })),
-        discount,
-        payments: buildPayments(payMethod, total, cashReceived)
-      })
-      if (!result.ok) {
-        if (result.error === 'STOCK_INSUFICIENTE' && result.items && result.items.length > 0) {
-          const detail = result.items
-            .map((i) => `${i.name} (disponible: ${i.available}, solicitado: ${i.requested})`)
-            .join('; ')
-          setToast({ type: 'error', message: `Stock insuficiente — ${detail}` })
-        } else if (result.error === 'PAGO_INSUFICIENTE') {
-          setToast({ type: 'error', message: 'El pago no cubre el total de la venta.' })
-        } else {
-          setToast({ type: 'error', message: `Error al registrar venta: ${result.error}` })
-        }
+      if (payMethod === 'tarjeta') {
+        await handleTerminalCharge()
         return
       }
-      clearCart()
-      setToast({ type: 'success', message: `Venta ${result.folio} registrada por ${fmt(total)}` })
+      await registerSale(buildPayments(payMethod, total, cashReceived))
     } catch (err) {
-      console.error('[SalesPage] Error al registrar venta:', err)
-      setToast({ type: 'error', message: 'No se pudo registrar la venta. Intenta de nuevo.' })
+      setToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'No se pudo registrar la venta.'
+      })
     } finally {
-      setCharging(false)
+      if (payMethod !== 'tarjeta') setCharging(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart, charging, user.id, discount, total, payMethod, cashReceived, clearCart])
 
   // ── Render ───────────────────────────────────────────────────
 
   return (
     <div className={styles.page}>
+      {terminalIntent && (
+        <TerminalPaymentModal
+          intentId={terminalIntent.id}
+          total={total}
+          status={terminalIntent.status}
+          paymentApproved={terminalIntent.paymentApproved}
+          onCancel={() => { void handleCancelTerminal() }}
+          onClose={handleCloseTerminalModal}
+        />
+      )}
       {historialOpen && <HistorialModal onClose={() => setHistorialOpen(false)} />}
       {corteOpen && (
         <CorteModal
